@@ -62,6 +62,12 @@ export const asyncRouterMap = [
         meta: { title: 'menu.dashboard.backtestCenter', keepAlive: true, icon: 'bar-chart', permission: ['dashboard'] }
       },
       {
+        path: '/wallet',
+        name: 'Wallet',
+        component: () => import('@/views/wallet'),
+        meta: { title: 'Wallet', keepAlive: true, icon: 'wallet', permission: ['dashboard'] }
+      },
+      {
         path: '/indicator-ide',
         name: 'IndicatorIDE',
         component: () => import('@/views/indicator-ide'),
