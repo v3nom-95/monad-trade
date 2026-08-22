@@ -15,6 +15,21 @@
 
 ---
 
+---
+
+## 🔗 Live demo
+
+> **https://external-tickets-relatively-clear.trycloudflare.com**
+
+```
+Username:  admin
+Password:  H2SZT-hoe-AlyAxKjHH1vX11
+```
+
+Try: **Backtest** (Strategy Lab) → **AI Assistant** → **Wallet** (connect to Monad Testnet 10143).
+
+---
+
 ## ⚡ The problem nobody else shows you
 
 > Every backtester reports one number. On a spot DEX, that number is fiction.
