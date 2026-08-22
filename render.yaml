@@ -1,0 +1,60 @@
+# Render Blueprint — Monad Trade
+# Deploy: render.com → New → Blueprint → connect this repo → Apply
+databases:
+  - name: monad-trade-db
+    databaseName: quantdinger
+    user: quantdinger
+    plan: free
+
+services:
+  - type: keyvalue
+    name: monad-trade-redis
+    plan: free
+    ipAllowList: []
+
+  - type: web
+    name: monad-trade-api
+    runtime: image
+    plan: free
+    image:
+      url: ghcr.io/openbyteinc/quantdinger-backend:latest
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: monad-trade-db, property: connectionString }
+      - key: REDIS_URL
+        fromService: { name: monad-trade-redis, type: keyvalue, property: connectionString }
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_USER
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false        # set in dashboard
+      - key: BRAND_APP_NAME
+        value: Monad Trade
+      - key: LLM_PROVIDER
+        value: google
+      - key: GOOGLE_API_KEY
+        sync: false        # set in dashboard
+      - key: GOOGLE_MODEL
+        value: gemini-2.5-flash
+      - key: BILLING_ENABLED
+        value: "false"
+      - key: QD_PROCESS_ROLE
+        value: legacy
+      - key: PORT
+        value: "5000"
+
+  - type: web
+    name: monad-trade-web
+    runtime: static
+    plan: free
+    buildCommand: pnpm install --no-frozen-lockfile && pnpm build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false        # set to the monad-trade-api URL after first deploy
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
