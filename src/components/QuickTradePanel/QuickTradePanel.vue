@@ -1,0 +1,2536 @@
+<template>
+  <div class="quick-trade-panel-root">
+    <component
+      :is="embedded ? 'div' : 'a-drawer'"
+      v-bind="containerProps"
+      @close="handleClose"
+      class="quick-trade-shell"
+      :class="[embedded ? 'quick-trade-embedded' : 'quick-trade-drawer', { 'theme-dark': isDark, 'qt-embedded-ide': embedded && embeddedIde }]"
+    >
+      <!-- Header (hidden in embedded mode since parent tab already shows title) -->
+      <div v-if="!embedded" class="qt-header">
+        <div class="qt-header-left">
+          <a-icon type="thunderbolt" theme="filled" class="qt-icon" />
+          <span class="qt-header-title">{{ $t('quickTrade.title') }}</span>
+        </div>
+        <a-icon type="close" class="qt-close" @click="handleClose" />
+      </div>
+
+      <!-- Symbol & Price Bar -->
+      <div class="qt-symbol-bar">
+        <div v-if="symbolLocked" class="qt-symbol-summary">
+          <div class="qt-symbol-summary-main">
+            <span class="qt-symbol-label">{{ $t('quickTrade.syncedWithChart') }}</span>
+            <strong class="qt-symbol-name">{{ currentSymbol || '-' }}</strong>
+          </div>
+          <a-tag class="qt-market-tag">{{ priceMarketParam }}</a-tag>
+        </div>
+        <div v-else class="qt-symbol-selector">
+          <a-select
+            v-model="currentSymbol"
+            show-search
+            :placeholder="$t('quickTrade.selectSymbol')"
+            style="width: 100%"
+            :filter-option="false"
+            :not-found-content="symbolSearching ? null : undefined"
+            :get-popup-container="qtSelectPopupContainer"
+            :dropdown-class-name="qtSelectDropdownClass"
+            @search="handleSymbolSearch"
+            @change="handleSymbolChange"
+            @focus="handleSymbolFocus"
+            :loading="symbolSearching"
+          >
+            <a-icon slot="suffixIcon" type="search" style="color: #9c8478" />
+            <a-select-option
+              v-for="item in symbolSuggestions"
+              :key="item.value"
+              :value="item.value"
+            >
+              <div class="qt-symbol-option">
+                <span class="qt-symbol-option-name">{{ item.symbol }}</span>
+                <span v-if="item.name" class="qt-symbol-option-desc">{{ item.name }}</span>
+              </div>
+            </a-select-option>
+          </a-select>
+        </div>
+        <div class="qt-price-display" :class="priceChangeClass">
+          <span class="qt-price-label">{{ $t('quickTrade.syncedPrice') }}</span>
+          <span class="qt-current-price">${{ formatPrice(currentPrice) }}</span>
+        </div>
+      </div>
+
+      <div :class="['qt-embedded-split', { 'qt-embedded-split--cols': embedded }]">
+        <div class="qt-embedded-col qt-embedded-col-left">
+
+          <!-- Credential Selector -->
+          <div class="qt-section">
+            <div class="qt-label">{{ accountLabel }} <span class="qt-crypto-hint">{{ accountHint }}</span></div>
+            <a-select
+              v-model="selectedCredentialId"
+              :placeholder="accountPlaceholder"
+              style="width: 100%"
+              :get-popup-container="qtSelectPopupContainer"
+              :dropdown-class-name="qtSelectDropdownClass"
+              @change="onCredentialChange"
+              :loading="credLoading"
+              :notFoundContent="isStockMarket ? $t('quickTrade.noBrokerAccount') : $t('quickTrade.noExchange')"
+            >
+              <a-select-option v-for="c in credentials" :key="c.id" :value="c.id">
+                {{ formatCredentialOptionLabel(c) }}
+                <a-tag v-if="c.enable_demo_trading" color="orange" size="small" style="margin-left: 6px;">{{ credentialEnvironmentLabel(c) }}</a-tag>
+                <a-tag v-if="c.market_type" size="small" style="margin-left: 6px;">{{ c.market_type }}</a-tag>
+              </a-select-option>
+            </a-select>
+            <div class="qt-account-actions">
+              <a-button type="primary" block size="small" class="qt-add-account-btn" @click="handleAddAccountClick">
+                <a-icon type="plus" /> {{ $t('quickTrade.addAccountInline') }}
+              </a-button>
+            </div>
+            <div class="qt-balance" v-if="selectedCredentialId">
+              <template v-if="balanceLoading">
+                <a-spin size="small" />
+                <span class="qt-balance-label qt-balance-loading-text">{{ $t('quickTrade.available') }}...</span>
+              </template>
+              <template v-else>
+                <template v-if="isStockMarket">
+                  <div class="qt-balance-line qt-balance-line--active">
+                    <span class="qt-balance-label">{{ $t('quickTrade.buyingPower') }}</span>
+                    <span class="qt-balance-value">${{ formatPrice(activeBalanceAvailable) }}</span>
+                  </div>
+                </template>
+                <template v-else>
+                  <div
+                    class="qt-balance-line"
+                    :class="{ 'qt-balance-line--active': isSwapMode }"
+                  >
+                    <span class="qt-balance-label">{{ $t('quickTrade.swapAvailable') }}</span>
+                    <span class="qt-balance-value">${{ formatPrice(swapBalanceAvailable) }}</span>
+                  </div>
+                  <div
+                    class="qt-balance-line"
+                    :class="{ 'qt-balance-line--active': !isSwapMode }"
+                  >
+                    <span class="qt-balance-label">{{ $t('quickTrade.spotAvailable') }}</span>
+                    <span class="qt-balance-value">${{ formatPrice(spotBalanceAvailable) }}</span>
+                  </div>
+                </template>
+                <div
+                  v-if="balanceErrorMessage"
+                  class="qt-balance-error-hint"
+                  :title="balance.error"
+                >
+                  {{ balanceErrorMessage }}
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Order Type -->
+          <div class="qt-section">
+            <a-radio-group v-model="orderType" button-style="solid" size="small" style="width: 100%;">
+              <a-radio-button value="market" style="width: 50%; text-align: center;">
+                {{ $t('quickTrade.market') }}
+              </a-radio-button>
+              <a-radio-button value="limit" style="width: 50%; text-align: center;">
+                {{ $t('quickTrade.limit') }}
+              </a-radio-button>
+            </a-radio-group>
+          </div>
+
+          <!-- Limit Price -->
+          <div class="qt-section" v-if="orderType === 'limit'">
+            <div class="qt-label">{{ $t('quickTrade.limitPrice') }}</div>
+            <a-input-number
+              v-model="limitPrice"
+              :min="0"
+              :step="priceStep"
+              :precision="pricePrecision"
+              style="width: 100%"
+              :placeholder="$t('quickTrade.enterPrice')"
+            />
+          </div>
+
+          <!-- Amount (USDT) -->
+          <div class="qt-section qt-amount-block">
+            <div class="qt-label">{{ amountLabel }} ({{ orderCurrency }})</div>
+            <a-input-number
+              v-model="amount"
+              :min="1"
+              :step="10"
+              :precision="2"
+              style="width: 100%"
+              :placeholder="$t('quickTrade.enterAmount')"
+            />
+            <div class="qt-quick-amounts">
+              <a-button
+                v-for="pct in quickAmountPcts"
+                :key="pct"
+                size="small"
+                @click="setAmountByPercent(pct)"
+                :disabled="activeBalanceAvailable <= 0"
+              >
+                {{ pct }}%
+              </a-button>
+            </div>
+            <div v-if="isSwapMode" class="qt-notional-summary">
+              {{ $t('quickTrade.marginNotionalFormula', {
+                margin: formatPrice(amount),
+                leverage: leverage,
+                notional: formatPrice(estimatedNotionalUsdt),
+                currency: orderCurrency
+              }) }}
+            </div>
+          </div>
+
+          <!-- Mode & Leverage -->
+          <div v-if="isCryptoMarket" class="qt-section qt-card qt-mode-card">
+            <div class="qt-section-title-row">
+              <span class="qt-section-title">{{ isSwapMode ? $t('quickTrade.leverage') : $t('quickTrade.spotModeTitle') }}</span>
+              <div class="qt-mode-toggle">
+                <div
+                  class="qt-mode-toggle-item"
+                  :class="{ active: tradeMode === 'swap' }"
+                  @click="tradeMode = 'swap'"
+                >{{ $t('quickTrade.contractBadge') }}</div>
+                <div
+                  class="qt-mode-toggle-item"
+                  :class="{ active: tradeMode === 'spot' }"
+                  @click="tradeMode = 'spot'"
+                >{{ $t('quickTrade.spotModeTitle') }}</div>
+              </div>
+            </div>
+            <template v-if="isSwapMode">
+              <div class="qt-leverage-row">
+                <div class="qt-leverage-slider-wrap">
+                  <a-slider
+                    v-model="leverage"
+                    :min="1"
+                    :max="125"
+                    :marks="leverageMarks"
+                    :tipFormatter="v => v + 'x'"
+                  />
+                </div>
+                <a-input-number
+                  v-model="leverage"
+                  :min="1"
+                  :max="125"
+                  :formatter="v => `${v}x`"
+                  :parser="v => String(v).replace('x', '')"
+                  class="qt-leverage-input"
+                />
+              </div>
+              <div class="qt-label qt-label-spaced">{{ $t('quickTrade.marginMode') }}</div>
+              <a-radio-group v-model="marginMode" size="small" button-style="solid" class="qt-margin-radio">
+                <a-radio-button value="cross">{{ $t('quickTrade.crossMargin') }}</a-radio-button>
+                <a-radio-button value="isolated">{{ $t('quickTrade.isolatedMargin') }}</a-radio-button>
+              </a-radio-group>
+              <div class="qt-hint-text">{{ $t('quickTrade.marginModeHint') }}</div>
+            </template>
+            <template v-else>
+              <div class="qt-spot-info">
+                <a-icon type="wallet" class="qt-spot-info-icon" />
+                <span class="qt-hint-text">{{ $t('quickTrade.spotModeHint') }}</span>
+              </div>
+            </template>
+          </div>
+          <div v-else class="qt-section qt-card qt-mode-card qt-stock-mode-card">
+            <div class="qt-section-title-row">
+              <span class="qt-section-title">{{ $t('quickTrade.alpacaAccount') }}</span>
+              <span class="qt-optional-tag">1x</span>
+            </div>
+            <div class="qt-spot-info">
+              <a-icon type="bank" class="qt-spot-info-icon" />
+              <span class="qt-hint-text">{{ $t('quickTrade.stockSpotModeHint') }}</span>
+            </div>
+          </div>
+
+          <!-- TP / SL (optional, always expanded) -->
+          <div class="qt-section qt-card qt-tpsl-card">
+            <div class="qt-section-title-row">
+              <span class="qt-section-title">{{ $t('quickTrade.tpsl') }}</span>
+              <span class="qt-optional-tag">{{ $t('quickTrade.optional') }}</span>
+            </div>
+            <div class="qt-tpsl-row">
+              <div class="qt-tpsl-item">
+                <span class="qt-label qt-tp-label">{{ $t('quickTrade.tp') }}</span>
+                <a-input-number
+                  v-model="tpPrice"
+                  :min="0"
+                  :step="priceStep"
+                  :precision="pricePrecision"
+                  class="qt-input-full"
+                  :placeholder="$t('quickTrade.tpPlaceholder')" />
+              </div>
+              <div class="qt-tpsl-item">
+                <span class="qt-label qt-sl-label">{{ $t('quickTrade.sl') }}</span>
+                <a-input-number
+                  v-model="slPrice"
+                  :min="0"
+                  :step="priceStep"
+                  :precision="pricePrecision"
+                  class="qt-input-full"
+                  :placeholder="$t('quickTrade.slPlaceholder')" />
+              </div>
+            </div>
+            <div class="qt-hint-text qt-tpsl-record-hint">{{ $t('quickTrade.tpslRecordOnlyHint') }}</div>
+          </div>
+
+          <!-- Submit Buttons -->
+          <div class="qt-submit-section qt-submit-section--embedded-left">
+            <a-button
+              type="primary"
+              size="large"
+              :loading="submittingSide === 'buy'"
+              :disabled="!canSubmit"
+              @click="handleSubmit('buy')"
+              class="qt-submit-btn qt-btn-long"
+            >
+              <a-icon type="arrow-up" />
+              {{ buyActionText }}
+            </a-button>
+            <a-button
+              type="danger"
+              size="large"
+              :loading="submittingSide === 'sell'"
+              :disabled="!canSubmit"
+              @click="handleSubmit('sell')"
+              class="qt-submit-btn qt-btn-short"
+            >
+              <a-icon type="arrow-down" />
+              {{ sellActionText }}
+            </a-button>
+          </div>
+
+        </div>
+        <div class="qt-embedded-col qt-embedded-col-right">
+
+          <!-- Current Positions -->
+          <div class="qt-position-section">
+            <div class="qt-section-header">
+              <a-icon type="wallet" /> {{ $t('quickTrade.currentPosition') }}
+              <span v-if="currentPositions.length > 1" class="qt-position-count">({{ currentPositions.length }})</span>
+            </div>
+            <template v-if="currentPositions.length > 0">
+              <div v-if="isSwapMode" class="qt-close-scope qt-close-scope-global">
+                <a-radio-group v-model="closeScope" size="small" class="qt-close-scope-radio">
+                  <a-radio-button value="full">{{ $t('quickTrade.closeScopeFull') }}</a-radio-button>
+                  <a-radio-button value="system_tracked">{{ $t('quickTrade.closeScopeSystem') }}</a-radio-button>
+                </a-radio-group>
+                <div class="qt-hint-text">{{ $t('quickTrade.closeScopeSystemHint') }}</div>
+              </div>
+              <div
+                v-for="(pos, idx) in currentPositions"
+                :key="'pos-' + idx + '-' + (pos.side || '') + '-' + String(pos.size || '')"
+                class="qt-position-card"
+                :class="pos.side"
+              >
+                <div class="qt-pos-row">
+                  <span>{{ $t('quickTrade.side') }}</span>
+                  <a-tag :color="pos.side === 'long' ? '#52c41a' : '#f5222d'" size="small">
+                    {{ pos.side === 'long'
+                      ? (isSwapMode ? $t('quickTrade.long') : $t('quickTrade.spotHold'))
+                      : $t('quickTrade.short') }}
+                  </a-tag>
+                </div>
+                <div class="qt-pos-row">
+                  <span>{{ $t('quickTrade.posSize') }}</span>
+                  <span>{{ pos.size }}</span>
+                </div>
+                <div class="qt-pos-row">
+                  <span>{{ $t('quickTrade.positionValue') }}</span>
+                  <span>{{ formatPrice(pos.notional_usdt) }} USDT</span>
+                </div>
+                <div class="qt-pos-row">
+                  <span>{{ $t('quickTrade.entryPrice') }}</span>
+                  <span>${{ formatPrice(pos.entry_price) }}</span>
+                </div>
+                <div class="qt-pos-row" v-if="pos.mark_price">
+                  <span>{{ $t('quickTrade.markPrice') }}</span>
+                  <span>${{ formatPrice(pos.mark_price) }}</span>
+                </div>
+                <div class="qt-pos-row" v-if="pos.leverage && pos.leverage > 1">
+                  <span>{{ $t('quickTrade.leverage') }}</span>
+                  <span>{{ pos.leverage }}x</span>
+                </div>
+                <div class="qt-pos-row">
+                  <span>{{ $t('quickTrade.unrealizedPnl') }}</span>
+                  <span :class="pos.unrealized_pnl >= 0 ? 'qt-green' : 'qt-red'">
+                    ${{ formatPrice(pos.unrealized_pnl) }}
+                  </span>
+                </div>
+                <a-button
+                  type="danger"
+                  size="small"
+                  block
+                  ghost
+                  @click="handleClosePosition(pos)"
+                  :loading="closingPositionSide === pos.side"
+                  style="margin-top: 8px;"
+                >
+                  {{ isSwapMode ? $t('quickTrade.closePosition') : $t('quickTrade.sellSpot') }}
+                </a-button>
+              </div>
+            </template>
+            <div v-else class="qt-position-empty">
+              <a-icon type="inbox" class="qt-empty-icon" />
+              <span class="qt-empty-desc">{{ $t('quickTrade.noPositionHint') }}</span>
+            </div>
+          </div>
+
+          <!-- Recent Trades -->
+          <div class="qt-history-section" v-if="recentTrades.length > 0">
+            <a-collapse :bordered="false" :activeKey="historyCollapsed ? [] : ['history']" @change="handleHistoryCollapse">
+              <a-collapse-panel key="history" :showArrow="false" :style="collapseStyle">
+                <template slot="header">
+                  <div class="qt-section-header" style="margin: 0; padding: 0;">
+                    <a-icon type="history" /> {{ $t('quickTrade.recentTrades') }}
+                    <span class="qt-history-count">({{ recentTrades.length }})</span>
+                  </div>
+                </template>
+                <div class="qt-trade-list">
+                  <div class="qt-trade-item" v-for="t in recentTrades" :key="t.id">
+                    <div class="qt-trade-main">
+                      <a-tag :color="t.side === 'buy' ? '#52c41a' : '#f5222d'" size="small">
+                        {{ t.side === 'buy' ? 'LONG' : 'SHORT' }}
+                      </a-tag>
+                      <span class="qt-trade-symbol">{{ t.symbol }}</span>
+                      <span class="qt-trade-amount">${{ formatPrice(t.amount) }}</span>
+                    </div>
+                    <div class="qt-trade-meta">
+                      <a-tag :color="t.status === 'filled' ? '#52c41a' : t.status === 'failed' ? '#f5222d' : '#faad14'" size="small">
+                        {{ t.status }}
+                      </a-tag>
+                      <span class="qt-trade-time">{{ formatTime(t.created_at) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </a-collapse-panel>
+            </a-collapse>
+          </div>
+
+        </div>
+      </div>
+
+    </component>
+    <exchange-account-modal
+      :visible.sync="showAddExchangeModal"
+      :overlay-mount="() => qtOverlayMount()"
+      @success="onExchangeAccountSaved"
+    />
+  </div>
+</template>
+
+<script>
+import { mapState } from 'vuex'
+import { listExchangeCredentials } from '@/api/credentials'
+import { formatExchangeCredentialLabel, isQuickTradeExchangeCredential } from '@/utils/exchangeCredential'
+import ExchangeAccountModal from '@/components/ExchangeAccountModal/ExchangeAccountModal.vue'
+import { placeQuickOrder, getQuickTradeBalance, getQuickTradePosition, getQuickTradeHistory, closeQuickTradePosition } from '@/api/quick-trade'
+import { searchSymbols, getWatchlist } from '@/api/market'
+import { getUserInfo } from '@/api/login'
+import request from '@/utils/request'
+import { createVisibilityPolling } from '@/utils/visibilityPolling'
+import { broker } from '@/api/broker'
+
+export default {
+  name: 'QuickTradePanel',
+  components: { ExchangeAccountModal },
+  props: {
+    visible: { type: Boolean, default: false },
+    symbol: { type: String, default: '' },
+    presetSide: { type: String, default: '' }, // 'buy' or 'sell' 閳?pre-filled from AI signal
+    presetPrice: { type: Number, default: 0 },
+    source: { type: String, default: 'manual' }, // ai_radar / ai_analysis / indicator / manual
+    marketType: { type: String, default: 'swap' }, // swap / spot
+    market: { type: String, default: 'Crypto' },
+    symbolLocked: { type: Boolean, default: false },
+    embedded: { type: Boolean, default: false },
+    embeddedIde: { type: Boolean, default: false },
+    overlayGetContainer: { type: Function, default: null }
+  },
+  data () {
+    return {
+      // exchange
+      credentials: [],
+      selectedCredentialId: undefined,
+      credLoading: false,
+      balanceLoading: false,
+      balance: {
+        available: 0,
+        total: 0,
+        swap: { available: 0, total: 0 },
+        spot: { available: 0, total: 0 }
+      },
+      // order
+      side: 'buy',
+      orderType: 'market',
+      limitPrice: 0,
+      amount: 100,
+      leverage: 5,
+      tradeMode: 'swap',
+      marginMode: 'cross',
+      tpPrice: null,
+      slPrice: null,
+      // state
+      submitting: false,
+      submittingSide: '',
+      closingPositionSide: null, // 'long' | 'short' | null
+      currentPrice: 0,
+      currentPositions: [],
+      recentTrades: [],
+      historyCollapsed: true,
+      closeScope: 'full', // full | system_tracked
+      // symbol search
+      currentSymbol: '',
+      symbolSuggestions: [],
+      symbolSearching: false,
+      symbolSearchTimer: null,
+      userId: null,
+      quickAmountPcts: [10, 25, 50, 75, 100],
+      // polling
+      pollTimer: null,
+      pricePoller: null,
+      accountPoller: null,
+      showAddExchangeModal: false
+    }
+  },
+  computed: {
+    ...mapState({
+      navTheme: state => state.app.theme
+    }),
+    isDark () {
+      return this.navTheme === 'dark' || this.navTheme === 'realdark'
+    },
+    qtSelectDropdownClass () {
+      return this.embeddedIde ? 'ide-qt-select-dropdown' : ''
+    },
+    normalizedMarket () {
+      return String(this.market || '').trim() || 'Crypto'
+    },
+    isStockMarket () {
+      return ['USStock', 'Stock', 'Stocks'].includes(this.normalizedMarket)
+    },
+    isCryptoMarket () {
+      return this.normalizedMarket === 'Crypto'
+    },
+    tradableMarketSupported () {
+      return this.isCryptoMarket || this.isStockMarket
+    },
+    priceMarketParam () {
+      return this.isStockMarket ? 'USStock' : 'Crypto'
+    },
+    orderCurrency () {
+      return this.isStockMarket ? 'USD' : 'USDT'
+    },
+    amountLabel () {
+      return this.$t(this.isSwapMode ? 'quickTrade.marginAmount' : 'quickTrade.amount')
+    },
+    estimatedNotionalUsdt () {
+      const amount = Math.max(0, Number(this.amount) || 0)
+      return this.isSwapMode ? amount * Math.max(1, Number(this.leverage) || 1) : amount
+    },
+    accountLabel () {
+      return this.isStockMarket ? this.$t('quickTrade.brokerAccount') : this.$t('quickTrade.exchange')
+    },
+    accountPlaceholder () {
+      return this.isStockMarket ? this.$t('quickTrade.selectBrokerAccount') : this.$t('quickTrade.selectExchange')
+    },
+    accountHint () {
+      return this.isStockMarket ? this.$t('quickTrade.usStockSpotOnly') : this.$t('quickTrade.cryptoAccountHint')
+    },
+    isSwapMode () {
+      return this.isCryptoMarket && this.tradeMode === 'swap'
+    },
+    leverageMarks () {
+      const keys = this.embeddedIde ? [1, 50, 125] : [1, 25, 50, 100, 125]
+      return keys.reduce((acc, v) => {
+        acc[v] = `${v}x`
+        return acc
+      }, {})
+    },
+    effectiveMarketType () {
+      return this.isStockMarket ? 'spot' : this.tradeMode
+    },
+    swapBalanceAvailable () {
+      const leg = this.balance && this.balance.swap
+      if (leg && leg.available != null) return parseFloat(leg.available) || 0
+      if (!this.isSwapMode) return 0
+      return parseFloat(this.balance.available) || 0
+    },
+    spotBalanceAvailable () {
+      const leg = this.balance && this.balance.spot
+      if (leg && leg.available != null) return parseFloat(leg.available) || 0
+      if (this.isSwapMode) return 0
+      return parseFloat(this.balance.available) || 0
+    },
+    activeBalanceAvailable () {
+      return this.isSwapMode ? this.swapBalanceAvailable : this.spotBalanceAvailable
+    },
+    balanceErrorMessage () {
+      const err = (this.balance && this.balance.error) || ''
+      if (!err) return ''
+      if (/40018|Invalid IP|invalid ip/i.test(err)) {
+        const ip = (this.balance && this.balance.request_ip) || ''
+        return this.$t('quickTrade.errorBitgetIpWhitelist', { ip: ip || '-' })
+      }
+      if (this.balance && this.balance.error_hint_key) {
+        const key = this.balance.error_hint_key
+        if (this.$te && this.$te(key)) return this.$t(key)
+      }
+      return err.length > 120 ? `${err.slice(0, 120)}...` : err
+    },
+    priceStep () {
+      if (this.currentPrice > 10000) return 1
+      if (this.currentPrice > 100) return 0.1
+      if (this.currentPrice > 1) return 0.01
+      return 0.0001
+    },
+    pricePrecision () {
+      if (this.currentPrice > 10000) return 0
+      if (this.currentPrice > 100) return 1
+      if (this.currentPrice > 1) return 2
+      return 4
+    },
+    canSubmit () {
+      return this.tradableMarketSupported && this.selectedCredentialId && this.selectedCredential && this.currentSymbol && this.amount > 0 && !this.submitting
+    },
+    selectedCredential () {
+      return this.credentials.find(c => c.id === this.selectedCredentialId)
+    },
+    priceChangeClass () {
+      return ''
+    },
+    buyActionText () {
+      return this.isSwapMode ? this.$t('quickTrade.buyLong') : this.$t('quickTrade.buySpot')
+    },
+    sellActionText () {
+      return this.isSwapMode ? this.$t('quickTrade.sellShort') : this.$t('quickTrade.sellSpot')
+    },
+    collapseStyle () {
+      return { background: 'transparent', borderRadius: '4px', border: 0, overflow: 'hidden' }
+    },
+    containerProps () {
+      if (this.embedded) return {}
+      return {
+        title: null,
+        width: 400,
+        visible: this.visible,
+        closable: false,
+        bodyStyle: { padding: 0 },
+        maskStyle: { background: 'rgba(0,0,0,0.45)' }
+      }
+    }
+  },
+  watch: {
+    visible (val) {
+      if (this.embedded) {
+        if (val) {
+          this.init()
+        } else {
+          this.stopPolling()
+        }
+        return
+      }
+      if (val) {
+        this.init()
+      } else {
+        this.stopPolling()
+      }
+    },
+    symbol (val) {
+      // Update currentSymbol when prop changes
+      if (val) {
+        this.currentSymbol = val
+      }
+    },
+    currentSymbol (val) {
+      // Reload price and position when symbol changes
+      if (val) {
+        this.loadPrice()
+        if (this.selectedCredentialId) {
+          this.loadPosition()
+        }
+        // Emit symbol change to parent
+        if (!this.symbolLocked) this.$emit('update:symbol', val)
+      }
+    },
+    market () {
+      this.tradeMode = this.isStockMarket ? 'spot' : (this.marketType === 'spot' ? 'spot' : 'swap')
+      this.selectedCredentialId = undefined
+      this.resetBalance()
+      this.currentPositions = []
+      this.recentTrades = []
+      this.loadCredentials()
+      this.loadWatchlistSymbols()
+      if (this.currentSymbol) this.loadPrice()
+    },
+    selectedCredentialId (val) {
+      // Reload position when credential changes
+      if (val && this.currentSymbol) {
+        this.loadPosition()
+      }
+    },
+    presetSide (val) {
+      if (val) this.side = val
+    },
+    presetPrice (val) {
+      if (val > 0) {
+        this.currentPrice = val
+        this.limitPrice = val
+      }
+    },
+    leverage () {
+      this.$nextTick(() => {
+        if (this.selectedCredentialId) {
+          this.loadBalance()
+          this.loadPosition()
+        }
+      })
+    },
+    tradeMode (val) {
+      if (this.isStockMarket && val !== 'spot') {
+        this.tradeMode = 'spot'
+        return
+      }
+      this.$nextTick(() => {
+        if (this.selectedCredentialId) {
+          this.loadBalance()
+          this.loadPosition()
+        }
+      })
+    }
+  },
+  mounted () {
+    if (this.embedded) {
+      if (this.visible) this.init()
+    } else if (this.visible) {
+      this.init()
+    }
+  },
+  methods: {
+    credentialEnvironmentLabel (credential) {
+      const environment = String((credential && credential.environment) || '').toLowerCase()
+      return this.$t(environment === 'testnet'
+        ? 'profile.exchange.environmentTestnet'
+        : 'profile.exchange.environmentDemo')
+    },
+    formatCredentialOptionLabel (cred) {
+      if (cred && cred.type === 'broker') {
+        return cred.name || this.$t('quickTrade.alpacaAccount')
+      }
+      return formatExchangeCredentialLabel(cred, {
+        unnamed: this.$t('brokerAccounts.cryptoSection.unnamed')
+      })
+    },
+    qtSelectPopupContainer (triggerNode) {
+      if (typeof this.overlayGetContainer === 'function') {
+        return this.overlayGetContainer(triggerNode)
+      }
+      const fs = document.fullscreenElement || document.webkitFullscreenElement
+      const el = this.$el
+      if (el && fs && typeof fs.contains === 'function' && fs.contains(el)) return fs
+      return document.body
+    },
+    qtOverlayMount () {
+      if (typeof this.overlayGetContainer === 'function') {
+        const n = this.overlayGetContainer()
+        return n || document.body
+      }
+      const fs = document.fullscreenElement || document.webkitFullscreenElement
+      const el = this.$el
+      if (el && fs && typeof fs.contains === 'function' && fs.contains(el)) return fs
+      return document.body
+    },
+    async init () {
+      // Initialize current symbol from prop
+      this.currentSymbol = this.symbol || ''
+      if (this.presetSide) this.side = this.presetSide
+      this.tradeMode = this.isStockMarket ? 'spot' : (this.marketType === 'spot' ? 'spot' : 'swap')
+      if (this.presetPrice > 0) {
+        this.currentPrice = this.presetPrice
+        this.limitPrice = this.presetPrice
+      }
+      await this.loadCredentials()
+      // Load user info to get userId
+      await this.loadUserInfo()
+      // Load watchlist crypto symbols for initial suggestions
+      await this.loadWatchlistSymbols()
+      // Load price for current symbol
+      if (this.currentSymbol) {
+        await this.loadPrice()
+      }
+      // Load position if credential and symbol are already available
+      if (this.selectedCredentialId && this.currentSymbol) {
+        await this.loadPosition()
+      }
+      this.loadHistory()
+      this.startPolling()
+    },
+    async loadUserInfo () {
+      try {
+        // Try to get user info from store first
+        const store = this.$store
+        const storeUserInfo = store?.getters?.userInfo || {}
+        if (storeUserInfo && storeUserInfo.id) {
+          this.userId = storeUserInfo.id
+          return
+        }
+        // If not in store, fetch from API
+        const res = await getUserInfo()
+        if (res && res.code === 1 && res.data) {
+          this.userId = res.data.id
+          // Update store
+          if (store) {
+            store.commit('SET_INFO', res.data)
+          }
+        }
+      } catch (e) {
+        console.warn('loadUserInfo error:', e)
+      }
+    },
+    apiPayload (res) {
+      if (!res) return {}
+      if (res.data && typeof res.data === 'object') return res.data.data || res.data
+      return res
+    },
+    apiSuccess (res) {
+      return !!(res && (res.success === true || res.code === 1 || (res.data && res.data.success === true)))
+    },
+    normalizeBrokerSymbol (symbol) {
+      return String(symbol || '').replace(/^USStock:/i, '').trim()
+    },
+    resetBalance () {
+      this.balance = {
+        available: 0,
+        total: 0,
+        swap: { available: 0, total: 0 },
+        spot: { available: 0, total: 0 }
+      }
+    },
+    toFiniteNumber (value, fallback = 0) {
+      const n = parseFloat(value)
+      return Number.isFinite(n) ? n : fallback
+    },
+    pickNumber (source, keys, fallback = 0) {
+      const obj = source || {}
+      for (const key of keys) {
+        if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
+          return this.toFiniteNumber(obj[key], fallback)
+        }
+      }
+      return fallback
+    },
+    pickOptionalNumber (source, keys) {
+      const obj = source || {}
+      for (const key of keys) {
+        if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
+          return this.toFiniteNumber(obj[key], 0)
+        }
+      }
+      return null
+    },
+    inferPositionSide (position, rawQty) {
+      const rawSide = String(
+        position.side ||
+        position.position_side ||
+        position.positionSide ||
+        position.pos_side ||
+        position.holdSide ||
+        ''
+      ).toLowerCase()
+      if (rawSide.includes('short') || rawSide.includes('sell')) return 'short'
+      if (rawSide.includes('long') || rawSide.includes('buy')) return 'long'
+      return rawQty < 0 ? 'short' : 'long'
+    },
+    calculatePositionPnl (side, size, entryPrice, markPrice) {
+      if (!(size > 0 && entryPrice > 0 && markPrice > 0)) return null
+      return side === 'short'
+        ? (entryPrice - markPrice) * size
+        : (markPrice - entryPrice) * size
+    },
+    normalizePosition (position, options = {}) {
+      const rawQty = this.pickNumber(position, ['size', 'qty', 'quantity', 'position', 'positionAmt', 'contracts'], 0)
+      const size = Math.abs(rawQty)
+      const side = this.inferPositionSide(position, rawQty)
+      const entryPrice = this.pickNumber(position, ['entry_price', 'avg_entry_price', 'avgEntryPrice', 'entryPrice', 'average_price', 'avgPrice'], 0)
+      const markPrice = this.pickNumber(position, ['mark_price', 'markPrice', 'current_price', 'currentPrice', 'last_price', 'lastPrice'], this.currentPrice || 0)
+      const providedNotional = this.pickOptionalNumber(position, ['notional_usdt', 'notionalUsd', 'notional_usd', 'notional', 'positionValue', 'position_value', 'value'])
+      const notionalUsdt = providedNotional !== null && Math.abs(providedNotional) > 0
+        ? Math.abs(providedNotional)
+        : (size > 0 && markPrice > 0 ? size * markPrice : 0)
+      const providedPnl = this.pickOptionalNumber(position, ['unrealized_pnl', 'unrealizedPnl', 'unrealized_pl', 'unrealizedPL', 'profit', 'pnl'])
+      const computedPnl = this.calculatePositionPnl(side, size, entryPrice, markPrice)
+      const shouldPreferComputed = options.preferComputedPnl || this.isStockMarket || this.effectiveMarketType === 'spot'
+      const unrealizedPnl = shouldPreferComputed
+        ? (computedPnl !== null ? computedPnl : (providedPnl !== null ? providedPnl : 0))
+        : (providedPnl !== null ? providedPnl : (computedPnl !== null ? computedPnl : 0))
+      return {
+        ...position,
+        side,
+        size,
+        entry_price: entryPrice,
+        mark_price: markPrice,
+        notional_usdt: notionalUsdt,
+        unrealized_pnl: unrealizedPnl,
+        leverage: this.pickNumber(position, ['leverage'], position.leverage || 1)
+      }
+    },
+    refreshPositionMarks (price = this.currentPrice) {
+      const mark = this.toFiniteNumber(price, 0)
+      if (!(mark > 0) || !Array.isArray(this.currentPositions) || this.currentPositions.length === 0) return
+      this.currentPositions = this.currentPositions.map(pos => this.normalizePosition({
+        ...pos,
+        mark_price: mark,
+        current_price: mark,
+        unrealized_pnl: undefined,
+        unrealizedPnl: undefined,
+        unrealized_pl: undefined,
+        unrealizedPL: undefined
+      }, { preferComputedPnl: true }))
+    },
+    applyNewPrice (price) {
+      const parsed = parseFloat(price || 0)
+      if (parsed > 0) {
+        const oldPrice = this.currentPrice
+        this.currentPrice = parsed
+        if (this.limitPrice === 0 || this.limitPrice === this.presetPrice || this.limitPrice === oldPrice) {
+          this.limitPrice = parsed
+        }
+        this.refreshPositionMarks(parsed)
+      }
+    },
+    handleAddAccountClick () {
+      if (this.isStockMarket) {
+        this.$router.push('/broker-accounts')
+        return
+      }
+      this.showAddExchangeModal = true
+    },
+    async loadWatchlistSymbols () {
+      if (!this.userId) {
+        // If no userId, try to load it first
+        await this.loadUserInfo()
+        if (!this.userId) {
+          console.warn('Cannot load watchlist: userId not available')
+          return
+        }
+      }
+      try {
+        const targetMarket = this.priceMarketParam.toLowerCase()
+        const res = await getWatchlist({ userid: this.userId })
+        if (res && res.code === 1 && res.data) {
+          const symbols = (res.data || []).filter(item =>
+            (item.market || '').toLowerCase() === targetMarket
+          ).map(item => ({
+            value: item.symbol || '',
+            symbol: item.symbol || '',
+            name: item.name || ''
+          })).filter(item => item.value)
+
+          this.symbolSuggestions = symbols
+        }
+      } catch (e) {
+        console.warn('loadWatchlistSymbols error:', e)
+      }
+    },
+    handleSymbolSearch (value) {
+      // Clear previous timer
+      if (this.symbolSearchTimer) {
+        clearTimeout(this.symbolSearchTimer)
+      }
+
+      if (!value || value.trim() === '') {
+        // If empty, load watchlist symbols
+        this.loadWatchlistSymbols()
+        return
+      }
+
+      // Debounce search
+      this.symbolSearchTimer = setTimeout(async () => {
+        this.symbolSearching = true
+        try {
+          const res = await searchSymbols({ market: this.priceMarketParam, keyword: value.trim(), limit: 20 })
+          if (res && res.code === 1 && res.data) {
+            this.symbolSuggestions = (res.data.items || res.data || []).map(item => ({
+              value: item.symbol || '',
+              symbol: item.symbol || '',
+              name: item.name || ''
+            })).filter(item => item.value)
+          } else {
+            this.symbolSuggestions = []
+          }
+        } catch (e) {
+          console.warn('handleSymbolSearch error:', e)
+          this.symbolSuggestions = []
+        } finally {
+          this.symbolSearching = false
+        }
+      }, 300)
+    },
+    handleSymbolChange (value) {
+      if (value && value !== this.currentSymbol) {
+        this.currentSymbol = value
+        // Load price for new symbol
+        this.loadPrice()
+        // Reload position for new symbol
+        if (this.selectedCredentialId) {
+          this.loadPosition()
+        }
+        // Emit to parent
+        if (!this.symbolLocked) this.$emit('update:symbol', value)
+      }
+    },
+    async loadPrice () {
+      if (!this.currentSymbol) {
+        this.currentPrice = 0
+        return
+      }
+      try {
+        const res = await request({
+          url: '/api/market/price',
+          method: 'get',
+          params: {
+            market: this.priceMarketParam,
+            symbol: this.currentSymbol
+          }
+        })
+        if (res && res.code === 1 && res.data) {
+          this.applyNewPrice(res.data.price || res.data.latest || res.data.last)
+          return
+        }
+        if (this.isStockMarket) {
+          const quote = await broker.alpaca.quote(this.normalizeBrokerSymbol(this.currentSymbol), { marketType: 'USStock' })
+          const data = this.apiPayload(quote)
+          this.applyNewPrice(data.price || data.latest || data.last || data.ask || data.bid)
+        }
+      } catch (e) {
+        console.warn('loadPrice error:', e)
+        if (this.isStockMarket) {
+          try {
+            const quote = await broker.alpaca.quote(this.normalizeBrokerSymbol(this.currentSymbol), { marketType: 'USStock' })
+            const data = this.apiPayload(quote)
+            this.applyNewPrice(data.price || data.latest || data.last || data.ask || data.bid)
+          } catch (stockErr) {
+            console.warn('load stock price error:', stockErr)
+          }
+        }
+        // Don't reset price on error, keep current value
+      }
+    },
+    handleSymbolFocus () {
+      // Load watchlist symbols when focusing if no suggestions
+      if (this.symbolSuggestions.length === 0) {
+        this.loadWatchlistSymbols()
+      }
+    },
+    async loadCredentials () {
+      this.credLoading = true
+      try {
+        if (this.isStockMarket) {
+          const status = await broker.alpaca.status()
+          const payload = this.apiPayload(status)
+          const connected = !!(payload.connected || payload.isConnected || payload.status === 'connected')
+          this.credentials = connected
+            ? [{
+                id: 'alpaca',
+                type: 'broker',
+                broker_id: 'alpaca',
+                exchange_id: 'alpaca',
+                name: this.$t('quickTrade.alpacaAccount'),
+                market_type: 'USStock'
+              }]
+            : []
+          if (this.selectedCredentialId && !this.credentials.some(c => c.id === this.selectedCredentialId)) {
+            this.selectedCredentialId = undefined
+            this.resetBalance()
+            this.currentPositions = []
+          }
+          if (!this.selectedCredentialId && this.credentials.length > 0) {
+            this.selectedCredentialId = this.credentials[0].id
+            this.onCredentialChange(this.selectedCredentialId)
+          }
+          return
+        }
+        const res = await listExchangeCredentials()
+        if (res.code === 1 && res.data) {
+          const all = res.data.items || res.data || []
+          this.credentials = all.filter(isQuickTradeExchangeCredential)
+          if (this.selectedCredentialId && !this.credentials.some(c => c.id === this.selectedCredentialId)) {
+            this.selectedCredentialId = undefined
+            this.resetBalance()
+            this.currentPositions = []
+          }
+          // Auto-select first if none selected
+          if (!this.selectedCredentialId && this.credentials.length > 0) {
+            this.selectedCredentialId = this.credentials[0].id
+            this.onCredentialChange(this.selectedCredentialId)
+          }
+        }
+      } catch (e) {
+        console.error('loadCredentials error:', e)
+      } finally {
+        this.credLoading = false
+      }
+    },
+    async onExchangeAccountSaved (data) {
+      const prevId = this.selectedCredentialId
+      await this.loadCredentials()
+      const newId = data && (data.id || data.credential_id)
+      if (newId && this.credentials.some(c => c.id === newId)) {
+        this.selectedCredentialId = newId
+        await this.onCredentialChange(newId)
+      } else if (newId) {
+        this.$message.warning(this.$t('quickTrade.noExchange'))
+      } else if (!prevId && this.credentials.length === 1) {
+        this.selectedCredentialId = this.credentials[0].id
+        await this.onCredentialChange(this.selectedCredentialId)
+      }
+    },
+    async onCredentialChange (credId) {
+      if (!this.credentials.some(c => c.id === credId)) {
+        this.selectedCredentialId = undefined
+        this.$message.warning(this.isStockMarket ? this.$t('quickTrade.noBrokerAccount') : this.$t('quickTrade.noExchange'))
+        return
+      }
+      this.selectedCredentialId = credId
+      await this.loadBalance()
+      await this.loadPosition()
+    },
+    async loadBalance () {
+      if (!this.selectedCredentialId) return
+      this.balanceLoading = true
+      try {
+        if (this.isStockMarket) {
+          const res = await broker.alpaca.account()
+          const d = this.apiPayload(res)
+          const available = parseFloat(d.buying_power || d.buyingPower || d.cash || 0) || 0
+          const total = parseFloat(d.equity || d.portfolio_value || d.portfolioValue || d.cash || available) || available
+          this.balance = {
+            available,
+            total,
+            currency: 'USD',
+            swap: { available: 0, total: 0 },
+            spot: { available, total }
+          }
+          return
+        }
+        const res = await getQuickTradeBalance({
+          credential_id: this.selectedCredentialId,
+          market_type: this.effectiveMarketType
+        })
+        if (res.code === 1 && res.data) {
+          const d = res.data || {}
+          const swap = d.swap && typeof d.swap === 'object' ? d.swap : {}
+          const spot = d.spot && typeof d.spot === 'object' ? d.spot : {}
+          const activeAvail = this.isSwapMode
+            ? (parseFloat(swap.available) || parseFloat(d.available) || 0)
+            : (parseFloat(spot.available) || parseFloat(d.available) || 0)
+          this.balance = {
+            available: activeAvail,
+            total: parseFloat(d.total) || 0,
+            currency: d.currency || 'USDT',
+            swap: {
+              available: parseFloat(swap.available) || 0,
+              total: parseFloat(swap.total) || 0
+            },
+            spot: {
+              available: parseFloat(spot.available) || 0,
+              total: parseFloat(spot.total) || 0
+            },
+            error: d.error || swap.error || spot.error || '',
+            error_hint_key: d.error_hint_key || '',
+            request_ip: d.request_ip || ''
+          }
+          if (d.error && this.$message) {
+            this.$message.warning(this.balanceErrorMessage || d.error, 6)
+          }
+        } else {
+          this.resetBalance()
+        }
+      } catch (e) {
+        console.warn('loadBalance error:', e)
+        this.balance = {
+          available: 0,
+          total: 0,
+          swap: { available: 0, total: 0 },
+          spot: { available: 0, total: 0 },
+          error: String(e.message || e)
+        }
+      } finally {
+        this.balanceLoading = false
+      }
+    },
+    async loadPosition () {
+      if (!this.selectedCredentialId || !this.currentSymbol) {
+        console.log('loadPosition skipped:', { credentialId: this.selectedCredentialId, symbol: this.currentSymbol })
+        return
+      }
+      try {
+        if (this.isStockMarket) {
+          const res = await broker.alpaca.positions()
+          const payload = this.apiPayload(res)
+          const items = Array.isArray(payload) ? payload : (payload.positions || payload.items || payload.data || [])
+          const target = this.normalizeBrokerSymbol(this.currentSymbol).toUpperCase()
+          const matched = (items || []).filter(p => this.normalizeBrokerSymbol(p.symbol || p.asset_symbol || '').toUpperCase() === target)
+          this.currentPositions = matched.map(p => this.normalizePosition({
+            ...p,
+            side: 'long',
+            leverage: 1
+          }, { preferComputedPnl: true }))
+          return this.currentPositions.length > 0
+        }
+        console.log('Loading position:', { credential_id: this.selectedCredentialId, symbol: this.currentSymbol, market_type: this.effectiveMarketType })
+        const res = await getQuickTradePosition({
+          credential_id: this.selectedCredentialId,
+          symbol: this.currentSymbol,
+          market_type: this.effectiveMarketType
+        })
+        console.log('Position response:', res)
+        if (res.code === 1 && res.data && res.data.positions && res.data.positions.length > 0) {
+          this.currentPositions = res.data.positions.map(p => this.normalizePosition(p))
+          console.log('Positions loaded:', this.currentPositions.length)
+          return true
+        } else {
+          this.currentPositions = []
+          console.log('No position found')
+          return false
+        }
+      } catch (e) {
+        console.error('loadPosition error:', e)
+        this.currentPositions = []
+        return false
+      }
+    },
+    async loadPositionWithRetry (maxRetries = 3, delayMs = 2000) {
+      // Try to load position immediately
+      let found = await this.loadPosition()
+      if (found) return
+
+      // If not found, retry with delay (exchange may need time to update)
+      for (let i = 0; i < maxRetries; i++) {
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+        found = await this.loadPosition()
+        if (found) {
+          console.log(`Position found after ${i + 1} retry(ies)`)
+          return
+        }
+      }
+      console.log('Position not found after all retries')
+    },
+    async loadHistory () {
+      try {
+        if (this.isStockMarket) {
+          const res = await broker.alpaca.orders({ limit: 5, status: 'all' })
+          const payload = this.apiPayload(res)
+          const items = Array.isArray(payload) ? payload : (payload.orders || payload.items || payload.data || [])
+          this.recentTrades = (items || []).slice(0, 5).map(o => ({
+            id: o.id || o.order_id || `${o.symbol}-${o.created_at || Date.now()}`,
+            symbol: o.symbol || this.currentSymbol,
+            side: o.side || 'buy',
+            amount: parseFloat(o.notional || o.filled_avg_price || o.limit_price || 0) || 0,
+            status: o.status || '',
+            created_at: o.created_at || o.submitted_at || o.updated_at
+          }))
+          return
+        }
+        const res = await getQuickTradeHistory({ limit: 5 })
+        if (res.code === 1 && res.data) {
+          this.recentTrades = res.data.trades || []
+        }
+      } catch (e) {
+        console.warn('loadHistory error:', e)
+      }
+    },
+    setAmountByPercent (pct) {
+      const avail = this.activeBalanceAvailable
+      if (avail > 0) {
+        this.amount = Math.floor(avail * pct / 100 * 100) / 100
+      }
+    },
+    async handleSubmit (side = 'buy') {
+      if (!this.canSubmit) return
+      this.side = side
+      this.submitting = true
+      this.submittingSide = side
+      try {
+        if (this.isStockMarket) {
+          await this.submitAlpacaOrder(side)
+          return
+        }
+        const payload = {
+          credential_id: this.selectedCredentialId,
+          symbol: this.currentSymbol,
+          side,
+          order_type: this.orderType,
+          amount: this.amount,
+          price: this.orderType === 'limit' ? this.limitPrice : 0,
+          leverage: this.isSwapMode ? this.leverage : 1,
+          market_type: this.effectiveMarketType,
+          margin_mode: this.isSwapMode ? this.marginMode : undefined,
+          tp_price: this.tpPrice || 0,
+          sl_price: this.slPrice || 0,
+          source: this.source
+        }
+        const res = await placeQuickOrder(payload)
+        if (res.code === 1) {
+          // Emit event for parent component (parent will show success message)
+          this.$emit('order-success', res.data)
+
+          // Reload all data after successful order
+          await this.loadBalance()
+          await this.loadHistory()
+
+          // Load position with retry mechanism (exchange may need time to update)
+          await this.loadPositionWithRetry()
+        } else {
+          const hint = res.error_hint ? this.$t(res.error_hint) : ''
+          this.$notification.error({
+            message: this.$t('quickTrade.orderFailed'),
+            description: hint || res.msg || ''
+          })
+        }
+      } catch (e) {
+        const rd = (e && e.response && e.response.data) || {}
+        const hint = rd.error_hint ? this.$t(rd.error_hint) : ''
+        this.$notification.error({
+          message: this.$t('quickTrade.orderFailed'),
+          description: hint || rd.msg || e.message || ''
+        })
+      } finally {
+        this.submitting = false
+        this.submittingSide = ''
+      }
+    },
+    async submitAlpacaOrder (side) {
+      const price = this.orderType === 'limit' ? parseFloat(this.limitPrice || 0) : parseFloat(this.currentPrice || 0)
+      if (!(price > 0)) {
+        this.$notification.error({
+          message: this.$t('quickTrade.orderFailed'),
+          description: this.$t('quickTrade.enterPrice')
+        })
+        return
+      }
+      const quantity = Number((parseFloat(this.amount || 0) / price).toFixed(6))
+      if (!(quantity > 0)) {
+        this.$notification.error({
+          message: this.$t('quickTrade.orderFailed'),
+          description: this.$t('quickTrade.errorHints.invalidSize')
+        })
+        return
+      }
+      const payload = {
+        symbol: this.normalizeBrokerSymbol(this.currentSymbol),
+        side,
+        quantity,
+        marketType: 'USStock',
+        orderType: this.orderType,
+        price: this.orderType === 'limit' ? price : undefined,
+        source: this.source
+      }
+      const res = await broker.alpaca.placeOrder(payload)
+      if (this.apiSuccess(res)) {
+        this.$emit('order-success', this.apiPayload(res))
+        await this.loadBalance()
+        await this.loadHistory()
+        await this.loadPositionWithRetry()
+      } else {
+        const data = this.apiPayload(res)
+        this.$notification.error({
+          message: this.$t('quickTrade.orderFailed'),
+          description: data.msg || data.message || ''
+        })
+      }
+    },
+    async handleClosePosition (pos) {
+      if (!pos || !this.selectedCredentialId || !this.currentSymbol) return
+      const leg = (pos.side || '').toLowerCase()
+      this.closingPositionSide = leg || null
+      try {
+        if (this.isStockMarket) {
+          const qty = parseFloat(pos.size || pos.qty || 0) || 0
+          if (!(qty > 0)) return
+          const res = await broker.alpaca.placeOrder({
+            symbol: this.normalizeBrokerSymbol(this.currentSymbol),
+            side: 'sell',
+            quantity: Number(qty.toFixed(6)),
+            marketType: 'USStock',
+            orderType: 'market',
+            source: 'manual'
+          })
+          if (this.apiSuccess(res)) {
+            this.$message.success(this.$t('quickTrade.positionClosed'))
+            await this.loadBalance()
+            await this.loadHistory()
+            await this.loadPositionWithRetry()
+          } else {
+            const data = this.apiPayload(res)
+            this.$notification.error({
+              message: this.$t('quickTrade.orderFailed'),
+              description: data.msg || data.message || ''
+            })
+          }
+          return
+        }
+        const payload = {
+          credential_id: this.selectedCredentialId,
+          symbol: this.currentSymbol,
+          market_type: this.effectiveMarketType,
+          size: 0,
+          close_scope: this.isSwapMode ? this.closeScope : 'full',
+          position_side: leg,
+          source: 'manual'
+        }
+        const res = await closeQuickTradePosition(payload)
+        if (res.code === 1) {
+          this.$message.success(this.$t('quickTrade.positionClosed'))
+          await this.loadBalance()
+          await this.loadHistory()
+          this.currentPositions = this.currentPositions.filter(p => (p.side || '').toLowerCase() !== leg)
+          setTimeout(async () => {
+            await this.loadPosition()
+          }, 2000)
+        } else {
+          const hint = res.error_hint ? this.$t(res.error_hint) : ''
+          this.$notification.error({
+            message: this.$t('quickTrade.orderFailed'),
+            description: hint || res.msg || ''
+          })
+        }
+      } catch (e) {
+        const rd = (e && e.response && e.response.data) || {}
+        const hint = rd.error_hint ? this.$t(rd.error_hint) : ''
+        this.$notification.error({
+          message: this.$t('quickTrade.orderFailed'),
+          description: hint || rd.msg || e.message || ''
+        })
+      } finally {
+        this.closingPositionSide = null
+      }
+    },
+    startPolling () {
+      this.stopPolling()
+      this.pricePoller = createVisibilityPolling(() => {
+        if (this.currentSymbol) {
+          this.loadPrice()
+        }
+      }, 10000, { immediate: false })
+      this.accountPoller = createVisibilityPolling(() => {
+        if (this.selectedCredentialId && this.currentSymbol) {
+          this.loadBalance()
+          this.loadPosition()
+        }
+      }, 15000, { immediate: false })
+      this.pricePoller.start()
+      this.accountPoller.start()
+    },
+    stopPolling () {
+      if (this.pricePoller) {
+        this.pricePoller.stop()
+        this.pricePoller = null
+      }
+      if (this.accountPoller) {
+        this.accountPoller.stop()
+        this.accountPoller = null
+      }
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer)
+        this.pollTimer = null
+      }
+    },
+    handleClose () {
+      this.$emit('close')
+      this.$emit('update:visible', false)
+    },
+    handleHistoryCollapse (activeKeys) {
+      this.historyCollapsed = !activeKeys.includes('history')
+    },
+    formatPrice (val) {
+      const v = parseFloat(val || 0)
+      if (Math.abs(v) >= 10000) return v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+      if (Math.abs(v) >= 100) return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      if (Math.abs(v) >= 1) return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+      return v.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 6 })
+    },
+    formatTime (ts) {
+      if (!ts) return ''
+      const d = new Date(ts)
+      const pad = n => String(n).padStart(2, '0')
+      return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+    }
+  },
+  beforeDestroy () {
+    this.stopPolling()
+  }
+}
+</script>
+
+<style lang="less" scoped>
+.quick-trade-drawer {
+  ::v-deep .ant-drawer-body {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto;
+  }
+}
+
+/* Drawer / default: wrapper is transparent; columns flatten into normal flow */
+.qt-embedded-split:not(.qt-embedded-split--cols) {
+  display: contents;
+}
+.qt-embedded-split:not(.qt-embedded-split--cols) .qt-embedded-col-left,
+.qt-embedded-split:not(.qt-embedded-split--cols) .qt-embedded-col-right {
+  display: contents;
+}
+/* IDE tab: left / right columns */
+.qt-embedded-split--cols {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px 0 6px;
+}
+.qt-embedded-split--cols .qt-embedded-col-left,
+.qt-embedded-split--cols .qt-embedded-col-right {
+  flex: 1;
+  min-width: 0;
+}
+.qt-embedded-split--cols .qt-embedded-col-right {
+  border-left: 1px solid #ebe8db;
+  padding-left: 14px;
+  padding-right: 4px;
+  margin-left: 2px;
+}
+.qt-embedded-split--cols .qt-section {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.quick-trade-embedded {
+  display: flex;
+  flex-direction: column;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+  .qt-embedded-split--cols {
+    padding: 8px 18px 12px;
+  }
+  .qt-symbol-bar {
+    padding: 8px 18px;
+    background: transparent;
+    flex-direction: row;
+    align-items: center;
+    .qt-symbol-selector { flex: 1; }
+    .qt-price-display { margin-left: 12px; }
+  }
+  .qt-section { padding: 6px 0; }
+  .qt-card { margin-left: 0; margin-right: 0; padding: 10px 12px; border-radius: 8px; }
+  .qt-mode-card,
+  .qt-tpsl-card {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .qt-mode-card { margin-top: 8px; }
+  .qt-tpsl-card { margin-top: 8px; }
+
+  .qt-mode-card .qt-section-title-row {
+    margin-bottom: 14px;
+  }
+  .qt-mode-card .qt-leverage-row {
+    margin-top: 8px;
+    margin-bottom: 8px;
+  }
+  .qt-mode-card .qt-label-spaced {
+    margin-top: 18px;
+    margin-bottom: 10px;
+  }
+  .qt-mode-card .qt-margin-radio {
+    margin-top: 6px;
+  }
+  .qt-mode-card .qt-hint-text {
+    margin-top: 14px;
+  }
+
+  .qt-tpsl-card .qt-section-title-row {
+    margin-bottom: 14px;
+  }
+  .qt-tpsl-card .qt-tpsl-row {
+    gap: 16px;
+  }
+  .qt-tpsl-card .qt-tpsl-item .qt-label {
+    display: block;
+    margin-bottom: 10px;
+  }
+  .qt-tpsl-card .qt-tpsl-record-hint {
+    margin-top: 16px;
+  }
+
+  .qt-submit-section--embedded-left {
+    padding: 12px 0 4px;
+    .qt-submit-btn { height: 40px; font-size: 14px; border-radius: 8px; }
+  }
+
+  .qt-position-section { padding: 0 0 10px; }
+  .qt-history-section { padding: 0 0 10px; }
+
+  .qt-direction-toggle .qt-dir-btn { padding: 8px; font-size: 13px; border-radius: 6px; }
+  .qt-quick-amounts { margin-top: 6px; margin-bottom: 2px; }
+  .qt-amount-block { padding-bottom: 6px; }
+  .qt-account-actions .qt-add-account-btn { height: 30px; }
+}
+
+.quick-trade-embedded.qt-embedded-ide {
+  .qt-embedded-split--cols {
+    // Child cards already use the same 14px outer margin as the symbol bar.
+    // Extra horizontal padding here made every section below it 24px narrower.
+    padding: 0 0 12px;
+    gap: 14px;
+  }
+  .qt-embedded-split--cols .qt-embedded-col-left,
+  .qt-embedded-split--cols .qt-embedded-col-right {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+  }
+  .qt-embedded-split--cols .qt-section {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+  .qt-symbol-bar {
+    margin: 0 14px 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+    border: 1px solid rgba(86, 69, 63, 0.08);
+    box-shadow: 0 1px 2px rgba(86, 69, 63, 0.04);
+    ::v-deep .ant-select-selection {
+      border-radius: 8px;
+      border-color: #e2dbc8;
+    }
+    .qt-current-price {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+  }
+  .qt-section:not(.qt-card) {
+    padding: 10px 14px;
+    margin: 0 14px 8px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid rgba(86, 69, 63, 0.06);
+    box-shadow: 0 1px 2px rgba(86, 69, 63, 0.03);
+  }
+  .qt-card {
+    margin-left: 14px;
+    margin-right: 14px;
+    margin-bottom: 8px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid rgba(86, 69, 63, 0.08);
+    box-shadow: 0 1px 3px rgba(86, 69, 63, 0.04);
+  }
+  .qt-mode-card,
+  .qt-tpsl-card {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+  .qt-submit-section--embedded-left {
+    padding: 8px 14px 4px;
+    margin: 0 14px;
+  }
+  .qt-position-section {
+    margin: 0 14px;
+    padding: 12px 14px 10px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid rgba(86, 69, 63, 0.06);
+    box-sizing: border-box;
+  }
+  .qt-history-section {
+    margin: 0 14px 8px;
+    padding: 8px 14px 12px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid rgba(86, 69, 63, 0.06);
+    box-sizing: border-box;
+  }
+  .qt-position-empty {
+    border-radius: 10px;
+  }
+  .qt-position-card {
+    border-radius: 10px;
+  }
+}
+
+.qt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid #ebe8db;
+  .qt-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    .qt-icon {
+      font-size: 20px;
+      color: #595959;
+    }
+    .qt-header-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+  .qt-close {
+    font-size: 16px;
+    cursor: pointer;
+    color: #9c8478;
+    &:hover { color: #333; }
+  }
+}
+
+.qt-symbol-bar {
+  padding: 12px 20px;
+  background: linear-gradient(180deg, #f7f5ec 0%, #ebe8db 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  .qt-symbol-selector {
+    width: 100%;
+    ::v-deep .ant-select {
+      width: 100%;
+    }
+    ::v-deep .ant-select-selection {
+      border-radius: 6px;
+      border: 1px solid #d3cab3;
+    }
+  }
+  .qt-symbol-summary {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(86, 69, 63, 0.08);
+  }
+  .qt-symbol-summary-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .qt-symbol-label {
+    font-size: 10px;
+    color: #8c8c8c;
+  }
+  .qt-symbol-name {
+    color: #262626;
+    font-size: 14px;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .qt-market-tag {
+    flex-shrink: 0;
+    margin-right: 0;
+    border-radius: 999px;
+    font-size: 11px;
+  }
+  .qt-price-display {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 2px;
+    white-space: nowrap;
+    .qt-price-label {
+      font-size: 10px;
+      color: #8c8c8c;
+    }
+    .qt-current-price {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+  }
+}
+
+.qt-symbol-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  .qt-symbol-option-name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .qt-symbol-option-desc {
+    color: #9c8478;
+    font-size: 12px;
+  }
+}
+
+.qt-section {
+  padding: 8px 20px;
+  .qt-label {
+    font-size: 12px;
+    color: #9c8478;
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+  .qt-crypto-hint {
+    font-size: 10px;
+    color: #faad14;
+    background: rgba(250, 173, 20, 0.1);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+  }
+}
+
+.qt-balance {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f7f5ec;
+  border: 1px solid #ebe8db;
+  font-size: 12px;
+
+  .qt-balance-label {
+    color: #8c8c8c;
+    flex-shrink: 0;
+  }
+  .qt-balance-loading-text { margin-left: 4px; }
+  .qt-balance-value {
+    color: #52c41a;
+    font-weight: 600;
+    margin-left: auto;
+  }
+  .qt-balance-error { color: #faad14; cursor: help; }
+}
+
+.qt-balance-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+  opacity: 0.72;
+
+  &--active {
+    opacity: 1;
+    .qt-balance-label {
+      color: #595959;
+      font-weight: 600;
+    }
+    .qt-balance-value {
+      color: #389e0d;
+    }
+  }
+}
+
+.qt-balance-error-hint {
+  font-size: 11px;
+  line-height: 1.45;
+  color: #cf1322;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 77, 79, 0.08);
+  border: 1px solid rgba(255, 77, 79, 0.25);
+}
+
+.qt-account-actions {
+  margin-top: 8px;
+}
+
+.qt-add-account-btn {
+  height: 32px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.qt-direction-toggle {
+  display: flex;
+  gap: 8px;
+  .qt-dir-btn {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    user-select: none;
+  }
+  .qt-dir-long {
+    color: #52c41a;
+    background: rgba(82, 196, 26, 0.06);
+    border-color: rgba(82, 196, 26, 0.2);
+    &.active {
+      background: #52c41a;
+      color: #fff;
+      border-color: #52c41a;
+      box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3);
+    }
+    &:hover:not(.active) {
+      border-color: #52c41a;
+    }
+  }
+  .qt-dir-short {
+    color: #f5222d;
+    background: rgba(245, 34, 45, 0.06);
+    border-color: rgba(245, 34, 45, 0.2);
+    &.active {
+      background: #f5222d;
+      color: #fff;
+      border-color: #f5222d;
+      box-shadow: 0 4px 12px rgba(245, 34, 45, 0.3);
+    }
+    &:hover:not(.active) {
+      border-color: #f5222d;
+    }
+  }
+}
+
+.qt-amount-block {
+  padding-bottom: 14px;
+}
+
+.qt-quick-amounts {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  button { flex: 1; font-size: 12px; }
+}
+
+.qt-notional-summary {
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  color: #389e0d;
+  background: rgba(82, 196, 26, 0.08);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.qt-leverage-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.qt-leverage-slider-wrap {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px 26px;
+
+  ::v-deep .ant-slider {
+    margin: 8px 6px 0;
+  }
+
+  ::v-deep .ant-slider-rail,
+  ::v-deep .ant-slider-track,
+  ::v-deep .ant-slider-step {
+    height: 4px;
+  }
+
+  ::v-deep .ant-slider-handle {
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+  }
+
+  ::v-deep .ant-slider-mark {
+    top: 14px;
+  }
+
+  ::v-deep .ant-slider-mark-text {
+    font-size: 11px;
+    color: #8c8c8c;
+    white-space: nowrap;
+    transform: translateX(-50%);
+  }
+
+  ::v-deep .ant-slider-mark-text-active {
+    color: var(--primary-color, #a37764);
+    font-weight: 600;
+  }
+
+  ::v-deep .ant-slider-mark:first-child .ant-slider-mark-text {
+    transform: translateX(0);
+  }
+
+  ::v-deep .ant-slider-mark:last-child .ant-slider-mark-text {
+    transform: translateX(-100%);
+  }
+}
+
+.qt-leverage-input {
+  width: 72px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.qt-card {
+  margin-left: 16px;
+  margin-right: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f4f2e9;
+  border: 1px solid #e5e0d0;
+}
+
+.qt-mode-card {
+  margin-top: 16px;
+}
+
+.qt-tpsl-card {
+  margin-top: 16px;
+}
+
+.qt-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.qt-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.qt-badge-contract {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ebebeb;
+  color: #595959;
+  border: 1px solid #d3cab3;
+}
+
+.qt-optional-tag {
+  font-size: 10px;
+  color: #8c8c8c;
+  background: #ebe8db;
+  padding: 1px 8px;
+  border-radius: 4px;
+}
+
+.qt-label-spaced {
+  margin-top: 10px;
+}
+
+.qt-margin-radio {
+  width: 100%;
+  display: flex;
+  ::v-deep .ant-radio-button-wrapper {
+    flex: 1;
+    text-align: center;
+    padding: 0 4px;
+  }
+}
+
+.qt-hint-text {
+  font-size: 11px;
+  color: #8c8c8c;
+  line-height: 1.45;
+  margin-top: 8px;
+}
+
+.qt-hint-inline {
+  margin-top: 6px;
+}
+
+.qt-mode-toggle {
+  display: flex;
+  background: #ebe8db;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+.qt-mode-toggle-item {
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #8c8c8c;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+  white-space: nowrap;
+  &:hover { color: #595959; }
+  &.active {
+    background: #fff;
+    color: var(--primary-color, #a37764);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+}
+.qt-spot-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 2px;
+}
+.qt-spot-info-icon {
+  font-size: 18px;
+  color: #52c41a;
+  flex-shrink: 0;
+}
+.qt-spot-info .qt-hint-text {
+  margin-top: 0;
+}
+
+.qt-tpsl-row {
+  display: flex;
+  gap: 12px;
+  .qt-tpsl-item { flex: 1; }
+}
+
+.qt-tpsl-record-hint {
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
+.qt-close-scope {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #e5e0d0;
+}
+
+.qt-label-close-scope {
+  margin-bottom: 6px;
+}
+
+.qt-close-scope-radio {
+  width: 100%;
+  display: flex;
+  ::v-deep .ant-radio-button-wrapper {
+    flex: 1;
+    text-align: center;
+    padding: 0 4px;
+    font-size: 12px;
+  }
+}
+
+.qt-tp-label {
+  color: #389e0d !important;
+}
+
+.qt-sl-label {
+  color: #cf1322 !important;
+}
+
+.qt-input-full {
+  width: 100%;
+}
+
+.qt-dir-btn.qt-dir-disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.qt-direction-toggle--spot .qt-dir-btn--solo {
+  flex: 1 1 100%;
+  max-width: 100%;
+}
+
+.qt-empty-icon {
+  font-size: 28px;
+  color: #d3cab3;
+  margin-bottom: 8px;
+}
+
+.qt-empty-desc {
+  font-size: 12px;
+  color: #8c8c8c;
+  line-height: 1.5;
+}
+
+.qt-submit-section {
+  padding: 12px 20px;
+  display: flex;
+  gap: 10px;
+  .qt-submit-btn {
+    flex: 1;
+    height: 48px;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 8px;
+    letter-spacing: 0.5px;
+  }
+  .qt-btn-long {
+    background: #52c41a !important;
+    border-color: #52c41a !important;
+    &:hover { background: #73d13d !important; }
+    &:active { background: #389e0d !important; }
+  }
+  .qt-btn-short {
+    background: #f5222d !important;
+    border-color: #f5222d !important;
+    &:hover { background: #ff4d4f !important; }
+    &:active { background: #cf1322 !important; }
+  }
+}
+
+.qt-stock-mode-card {
+  border-color: rgba(45, 140, 255, 0.18);
+  background: linear-gradient(135deg, rgba(45, 140, 255, 0.08), rgba(82, 196, 26, 0.06));
+}
+
+.qt-position-section {
+  padding: 8px 20px 12px;
+  .qt-section-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6a5449;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .qt-position-count {
+    font-size: 12px;
+    color: #9c8478;
+    font-weight: 400;
+  }
+  .qt-close-scope-global {
+    margin-bottom: 10px;
+  }
+}
+
+.qt-history-section {
+  padding: 8px 20px 12px;
+  ::v-deep .ant-collapse {
+    background: transparent;
+    border: none;
+  }
+  ::v-deep .ant-collapse-item {
+    border: none;
+  }
+  ::v-deep .ant-collapse-header {
+    padding: 0 !important;
+    cursor: pointer;
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+  ::v-deep .ant-collapse-content {
+    border: none;
+    background: transparent;
+  }
+  ::v-deep .ant-collapse-content-box {
+    padding: 8px 0 0 0 !important;
+  }
+  .qt-section-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6a5449;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+  }
+  .qt-history-count {
+    font-size: 12px;
+    color: #9c8478;
+    font-weight: 400;
+  }
+}
+
+.qt-position-card {
+  background: #f7f5ec;
+  border-radius: 8px;
+  padding: 10px 12px;
+  border-left: 3px solid #d3cab3;
+  & + .qt-position-card {
+    margin-top: 10px;
+  }
+  &.long { border-left-color: #52c41a; }
+  &.short { border-left-color: #f5222d; }
+  .qt-pos-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 2px 0;
+    span:first-child { color: #9c8478; }
+  }
+}
+
+.qt-position-empty {
+  background: #f7f5ec;
+  border-radius: 8px;
+  padding: 20px 12px;
+  text-align: center;
+  border: 1px dashed #d3cab3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qt-green { color: #52c41a !important; }
+.qt-red   { color: #f5222d !important; }
+
+.qt-trade-list {
+  .qt-trade-item {
+    padding: 6px 0;
+    border-bottom: 1px solid #f4f2e9;
+    &:last-child { border-bottom: none; }
+    .qt-trade-main {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      .qt-trade-symbol { font-weight: 600; font-size: 13px; }
+      .qt-trade-amount { margin-left: auto; font-size: 13px; }
+    }
+    .qt-trade-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 2px;
+      .qt-trade-time { font-size: 11px; color: #bbb; }
+    }
+  }
+}
+
+/* ======== Dark Theme ======== */
+  .theme-dark {
+  .qt-embedded-split--cols .qt-embedded-col-right {
+    border-left-color: #33353a;
+  }
+  &.quick-trade-embedded {
+    background: transparent;
+    border-color: transparent;
+    .qt-symbol-bar {
+      background: transparent;
+    }
+  }
+  &.quick-trade-embedded.qt-embedded-ide {
+    .qt-symbol-bar {
+      background: linear-gradient(135deg, #262626 0%, #1a1b1e 100%);
+      border-color: #363636;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+      ::v-deep .ant-select-selection {
+        border-color: #434343;
+      }
+    }
+    .qt-section:not(.qt-card) {
+      background: #222327;
+      border-color: #363636;
+      box-shadow: none;
+    }
+    .qt-card {
+      background: #222327;
+      border-color: #404040;
+      box-shadow: none;
+    }
+    .qt-position-section,
+    .qt-history-section {
+      background: #222327;
+      border-color: #363636;
+    }
+  }
+  .qt-header {
+    border-bottom-color: #33353a;
+    .qt-icon { color: #a3a3a3; }
+    .qt-header-title { color: #dcd5c2; }
+    .qt-close { color: #6a5449; &:hover { color: #bbb; } }
+  }
+  .qt-symbol-bar {
+    background: linear-gradient(180deg, #262626 0%, #222327 100%);
+    .qt-symbol-summary {
+      background: rgba(20, 20, 20, 0.64);
+      border-color: #363636;
+    }
+    .qt-symbol-label,
+    .qt-price-label {
+      color: #8c8c8c;
+    }
+    .qt-symbol-name {
+      color: #ebe8db;
+    }
+    .qt-market-tag {
+      background: #2a2a2a;
+      color: #d3cab3;
+      border-color: #434343;
+    }
+    .qt-current-price { color: #dcd5c2; }
+    ::v-deep .ant-select-selection {
+      background: #262626;
+      border-color: #33353a;
+      color: #dcd5c2;
+    }
+    ::v-deep .ant-select-selection__placeholder {
+      color: #6a5449;
+    }
+  }
+  .qt-symbol-option {
+    .qt-symbol-option-name { color: #dcd5c2; }
+    .qt-symbol-option-desc { color: #9c8478; }
+  }
+  .qt-section {
+    .qt-label { color: #777; }
+  }
+  .qt-position-section {
+    .qt-section-header { color: #ccc; }
+    .qt-position-count { color: #8a7166; }
+  }
+  .qt-position-card {
+    background: #262626;
+    .qt-pos-row span:first-child { color: #777; }
+    .qt-pos-row span:last-child { color: #ccc; }
+  }
+  .qt-history-section {
+    .qt-section-header {
+      color: #ccc;
+    }
+    .qt-history-count {
+      color: #8a7166;
+    }
+    ::v-deep .ant-collapse {
+      background: transparent !important;
+      color: #ccc;
+      .ant-collapse-header {
+        color: #ccc !important;
+        &:hover {
+          opacity: 0.8;
+        }
+      }
+      .ant-collapse-content {
+        background: transparent;
+        color: #ccc;
+      }
+    }
+  }
+  .qt-trade-item {
+    border-bottom-color: #2a2a2a !important;
+    .qt-trade-symbol { color: #dcd5c2; }
+    .qt-trade-amount { color: #ccc; }
+  }
+  ::v-deep .ant-collapse {
+    background: transparent !important;
+    color: #ccc;
+    .ant-collapse-header { color: #ccc !important; }
+    .ant-collapse-content { background: transparent; color: #ccc; }
+  }
+  ::v-deep .ant-drawer-content {
+    background: #161618;
+  }
+  ::v-deep .ant-select-selection,
+  ::v-deep .ant-input-number {
+    background: #262626;
+    border-color: #33353a;
+    color: #dcd5c2;
+  }
+  ::v-deep .ant-radio-group .ant-radio-button-wrapper {
+    background: #262626;
+    border-color: #33353a;
+    color: #ccc;
+    &.ant-radio-button-wrapper-checked {
+      background: #434343;
+      border-color: #595959;
+      color: #fff;
+    }
+  }
+  ::v-deep .ant-slider-rail { background: #33353a; }
+  ::v-deep .ant-slider-track { background: #737373; }
+  .qt-leverage-slider-wrap ::v-deep .ant-slider-mark-text {
+    color: #8c8c8c;
+  }
+  .qt-leverage-slider-wrap ::v-deep .ant-slider-mark-text-active {
+    color: #58a6ff;
+  }
+  .qt-balance {
+    background: #262626;
+    border-color: #363636;
+    .qt-balance-label { color: #8c8c8c; }
+    .qt-balance-line--active .qt-balance-label { color: #d3cab3; }
+    .qt-balance-value { color: #73d13d; }
+    .qt-balance-line--active .qt-balance-value { color: #95de64; }
+  }
+  .qt-add-account-btn {
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--primary-color, #a37764) 22%, transparent);
+  }
+  .qt-card {
+    background: #262626;
+    border-color: #3a3a3a;
+  }
+  .qt-section-title {
+    color: #e5e0d0;
+  }
+  .qt-badge-contract {
+    background: #333;
+    color: #bfbfbf;
+    border-color: #434343;
+  }
+  .qt-optional-tag {
+    background: #2a2a2a;
+    color: #8a7166;
+  }
+  .qt-hint-text {
+    color: #777;
+  }
+  .qt-mode-toggle {
+    background: #2a2a2a;
+  }
+  .qt-mode-toggle-item {
+    color: #777;
+    &:hover { color: #bbb; }
+    &.active {
+      background: #3a3a3a;
+      color: #58a6ff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+  }
+  .qt-spot-info-icon {
+    color: #73d13d;
+  }
+  .qt-tp-label {
+    color: #95de64 !important;
+  }
+  .qt-sl-label {
+    color: #ff7875 !important;
+  }
+  .qt-close-scope {
+    border-top-color: #3a3a3a;
+  }
+
+  .qt-position-empty {
+    background: #262626;
+    border-color: #33353a;
+  }
+  .qt-empty-icon {
+    color: #434343;
+  }
+  .qt-empty-desc {
+    color: #8a7166;
+  }
+}
+</style>
