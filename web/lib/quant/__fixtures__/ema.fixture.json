@@ -1,0 +1,6 @@
+{
+  "comment": "Hand-computed. EMA(3), k=2/(3+1)=0.5, SMA-seeded convention: seed = SMA(first 3) = (2+1+8)/3 = 3.6666667 emitted at index 2; then i3 = 3.6667 + 0.5*(4-3.6667) = 3.8333333; i4 = 3.8333 + 0.5*(6-3.8333) = 4.9166667. NOTE: first-value-seeded implementations diverge here (they would emit from index 1 with different values) — this fixture pins the SMA-seeded convention deliberately because it is the standard TA-lib-style choice.",
+  "closes": [2, 1, 8, 4, 6],
+  "period": 3,
+  "expected": [null, null, 3.6666666666666665, 3.833333333333333, 4.916666666666666]
+}

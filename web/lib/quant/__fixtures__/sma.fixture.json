@@ -1,0 +1,6 @@
+{
+  "comment": "Hand-computed. SMA(3) over closes [1,2,3,4,5]: at i=2 -> (1+2+3)/3=2; i=3 -> 3; i=4 -> 4. Leading nulls = period-1 = 2.",
+  "closes": [1, 2, 3, 4, 5],
+  "period": 3,
+  "expected": [null, null, 2, 3, 4]
+}

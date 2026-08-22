@@ -28,3 +28,10 @@ vite-dev*.log
 *.sln
 *.sw*
 package-lock.json
+
+# Next.js app (web/)
+web/node_modules/
+web/.next/
+web/.env*
+!web/.env.example
+web/lib/quant/.cache/

@@ -1,0 +1,17 @@
+{
+  "comment": "RSI(14) boundary cases. Case 1: strictly rising closes -> every delta is a gain -> RSI = 100 exactly. Case 2: strictly falling closes -> RSI = 0 exactly. Warm-up for RSI(14) needs 15 candles (14 deltas), so leading nulls = 14. Wilder's original 1978 worked example is not reproducible offline with confidence, so the canonical boundary cases are used instead.",
+  "cases": [
+    {
+      "name": "all gains",
+      "candles": [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114],
+      "period": 14,
+      "expectedRsi": 100
+    },
+    {
+      "name": "all losses",
+      "candles": [114, 113, 112, 111, 110, 109, 108, 107, 106, 105, 104, 103, 102, 101, 100],
+      "period": 14,
+      "expectedRsi": 0
+    }
+  ]
+}

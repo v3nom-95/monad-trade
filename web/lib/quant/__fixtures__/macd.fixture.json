@@ -1,0 +1,7 @@
+{
+  "comment": "MACD(12,26,9) structural fixture. Exact hand-computed values for 26+ candles are error-prone by hand, so this fixture pins the STRUCTURE that catches the classic bug: (1) macd line = ema(fast) - ema(slow), aligned to input with leading nulls = slow-1; (2) the SIGNAL LINE MUST BE AN EMA OF THE MACD LINE, NOT OF PRICE. The test script recomputes both independently and asserts signal === ema(macdLineValues, 9). Closes are a deterministic pseudo-random ramp.",
+  "closes": [100, 101, 99, 102, 103, 101, 104, 106, 105, 107, 108, 106, 109, 110, 108, 111, 112, 110, 113, 114, 112, 115, 116, 114, 117, 118, 116, 119, 120, 118],
+  "fast": 12,
+  "slow": 26,
+  "signalPeriod": 9
+}
