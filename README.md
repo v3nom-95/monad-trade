@@ -1,228 +1,127 @@
-<h1 align="center">QuantDinger Web Frontend</h1>
+<div align="center">
 
-<p align="center">
-  <strong>Desktop web client for QuantDinger, an open-source AI Trading OS.</strong><br/>
-  Research, strategy design, backtesting, automation, portfolio operations, and account workflows in one browser workspace.
-</p>
+# Monad Trade
 
-<p align="center">
-  <a href="./README.md"><strong>English</strong></a> |
-  <a href="./README_CN.md"><strong>简体中文</strong></a>
-</p>
+**An AI-native quant trading terminal for Monad — that tells you which of its signals you can actually execute.**
 
-<p align="center">
-  <a href="https://github.com/OpenByteInc/QuantDinger"><img src="https://img.shields.io/badge/Main_Repo-QuantDinger-blue?logo=github" alt="Main Repo" /></a>
-  <img src="https://img.shields.io/badge/Vue-2.7-4FC08D?logo=vue.js" alt="Vue 2.7" />
-  <img src="https://img.shields.io/badge/Vite-5-646CFF?logo=vite" alt="Vite 5" />
-  <img src="https://img.shields.io/badge/UI-Ant_Design_Vue-1890ff?logo=ant-design" alt="Ant Design Vue" />
-  <img src="https://img.shields.io/badge/License-Source_Available-orange" alt="License" />
-</p>
+</div>
 
 ---
 
-## What this repo is
+## The problem
 
-This repository contains the Vue desktop web frontend for [QuantDinger](https://github.com/OpenByteInc/QuantDinger), a product of **Open Byte Inc**.
+Every backtester shows you one number: total P&L. On a spot DEX that number is a lie.
 
-QuantDinger is better described as an **AI Trading OS** than a narrow "quant platform": it combines AI-assisted market analysis, strategy creation, backtesting, simulated trading, live execution workflows, exchange API management, billing, and operations tools. This repo is the main browser interface for those workflows.
+Roughly **half of every mean-reversion strategy's trades are shorts** — and you cannot short
+on a spot DEX. A strategy that reports +271 may only have been able to place +160 of it.
 
-For backend APIs, Docker Compose deployment, database services, and project-level documentation, start from the main repository:
+Monad Trade reports **both numbers, always**.
 
-- [QuantDinger main repository](https://github.com/OpenByteInc/QuantDinger)
-- [Cloud deployment guide](https://github.com/OpenByteInc/QuantDinger/tree/main/docs)
+```
+RSI-14 · MON/USDT · 6,500 hourly bars · 8.9 months
 
-## Feature areas
+  Total P&L        271.70      ← what the signal said
+  Executable only  160.14      ← what a spot DEX could place
+  181 trades · 64.6% win · 6.3% max drawdown
+  91 of 181 trades unplaceable  (short-not-supported-on-spot)
+```
 
-- AI market analysis, asset research, and assistant-style decision support
-- Strategy and indicator authoring with chart inspection and code editing
-- Backtest center with result review, trade records, and equity curves
-- Trading assistant, trading bot, quick trade, and portfolio views
-- Exchange account binding and API key management UI
-- Membership, credits, billing, admin, OAuth, settings, and profile pages
-- Multilingual UI, theme switching, and responsive layouts
+Every excluded trade carries a machine-readable reason. Nothing is hidden.
 
-## Production deployment
+---
 
-Most users should deploy the full QuantDinger stack from the main repo. You do **not** need Node.js or this source tree for production if you use the published Docker images.
+## Features
 
-### Full stack, recommended
+| | |
+|---|---|
+| **Strategy Lab** | SMA / RSI / MACD backtests on live market data, with total *and* executable-only P&L |
+| **AI Assistant** | Gemini-powered strategy analysis that reasons about your actual trade list |
+| **Token tracking by address** | Paste any contract address — resolves via DexScreener, picks the deepest-liquidity pair across up to 30 |
+| **Monad wallet layer** | Testnet-pinned (10143), structural wrong-network guard, live balances |
+| **Kuru DEX integration** | On-chain collateral deposits, order encoding, guards that refuse rather than burn gas |
+| **Indicator IDE** | Author, validate and version your own indicators |
+| **Market + Live** | Watchlists, charts, execution surfaces |
 
-Linux or macOS:
+---
+
+## Monad-specific engineering
+
+Monad is not Ethereum. These are handled explicitly:
+
+- **Gas is charged on `gas_limit`, not gas used** — estimates padded 18%, never 2×, and the
+  confirmation shows *worst-case* cost (`gas_limit × maxFee`), not an estimate
+- **10 MON reserve floor** — below it accounts are throttled to one tx per ~1.2s. We warn
+  rather than block, because the emptying-transaction exception still permits spending
+- **EIP-7702 detection** — delegated accounts lose that exception and are hard-blocked
+- **`eth_sendRawTransactionSync`** — receipt returned in the same call, no polling
+- **Block tags** — quotes read at `latest`, settlement confirmed at `finalized`
+
+---
+
+## Deployed contracts — Monad Testnet (`10143`)
+
+RPC `https://testnet-rpc.monad.xyz` · Explorer `https://testnet.monadexplorer.com`
+
+Every address verified with `eth_getCode` against the live chain.
+
+| Contract | Address |
+|---|---|
+| Kuru Router | `0x7EFbE105Ca7415dE98F96622173458ac1c054630` |
+| Kuru OrderBookImpl | `0x72caE0a99C19B574e8a6De558F43fc1D019c9374` |
+| Kuru Market MON/USDC | `0xa241896A7Dbe8a550D2E5fF7A914bB1989ceD2D9` |
+| Kuru MarginAccount | `0xd029C2D98ff85D8F64799017fE00a59B1159CE02` |
+| USDC (testnet) | `0x3bA3d39AFcf8bb994f7964B3e0171Ea2Ba361570` |
+| WMON (live) | `0x5a4E0bFDeF88C9032CB4d24338C5EB3d3870BfDd` |
+| Multicall3 | `0xcA11bde05977b3631167028862bE2a173976CA11` |
+| Permit2 | `0x000000000022d473030f116ddee9f6b43ac78ba3` |
+
+Market parameters read live from `getMarketParams()`: base `address(0)` (native MON) ·
+quote USDC · `minSize 200 MON` · `tickSize 0.000001` · 0 bps taker/maker.
+
+> We deploy no contracts. Monad Trade integrates existing on-chain protocols, and every
+> address above is independently verifiable.
+
+---
+
+## What we found on Monad testnet
+
+- Uniswap is **not deployed on testnet** — 17 protocols there vs 175 on mainnet
+- Kuru MON/USDC: **`s_orderIdCounter() == 0`** — not one order has ever been placed
+- `bestBidAsk()` returns the empty sentinels; the AMM vault holds nothing
+- A wallet holding **297,579 MON** gets the same `InsufficientBalance()` revert as one holding 4
+
+So a swap cannot fill today — proven at the contract level with decoded revert selectors
+(`SizeError 0x0a5c4f1f`, `InsufficientBalance 0xf4d678b8`), not assumed.
+
+**Working on-chain today:** wallet connect · live balance reads · live market/orderbook reads ·
+**collateral deposit to Kuru MarginAccount (confirmed on-chain)**.
+
+---
+
+## Run locally
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OpenByteInc/QuantDinger/main/install.sh | bash
+docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
+# → http://127.0.0.1:8888
 ```
 
-Windows PowerShell:
+Configure `backend.env`:
 
-```powershell
-irm https://raw.githubusercontent.com/OpenByteInc/QuantDinger/main/install.ps1 | iex
+```
+SECRET_KEY=<python -c "import secrets; print(secrets.token_hex(32))">
+ADMIN_USER=admin
+ADMIN_PASSWORD=<strong>
+BRAND_APP_NAME=Monad Trade
+LLM_PROVIDER=google
+GOOGLE_API_KEY=<your key>
+GOOGLE_MODEL=gemini-2.5-flash
 ```
 
-The main stack serves the desktop web app at:
+If port 6379 is taken, set `REDIS_PORT=127.0.0.1:6380` in a root `.env`.
+After rebuilding the frontend, always swap with `--force-recreate`.
 
-```text
-http://localhost:8888
-```
+---
 
-### GHCR Compose without cloning the repo
+## Licence
 
-```bash
-curl -O https://raw.githubusercontent.com/OpenByteInc/QuantDinger/main/docker-compose.ghcr.yml
-curl -o backend.env https://raw.githubusercontent.com/OpenByteInc/QuantDinger/main/backend_api_python/env.example
-# edit backend.env before public deployment
-docker compose -f docker-compose.ghcr.yml pull
-docker compose -f docker-compose.ghcr.yml up -d
-```
-
-The frontend image used by the stack is:
-
-```text
-ghcr.io/openbyteinc/quantdinger-frontend
-```
-
-Common tags are `latest`, semantic versions such as `4.0.4`, and major/minor tags such as `4.0`. Pin a release in the main repo `.env` with `IMAGE_TAG`, or override only this service with `FRONTEND_TAG`.
-
-### Run this frontend image alone
-
-Use this when the backend is already running somewhere else:
-
-```bash
-docker run -d --name quantdinger-frontend \
-  -p 8888:80 \
-  -e BACKEND_URL=http://host.docker.internal:5000 \
-  ghcr.io/openbyteinc/quantdinger-frontend:latest
-```
-
-`BACKEND_URL` controls the Nginx `/api/` proxy inside the container. In the main Compose stack it normally stays as `http://backend:5000`.
-
-## Local development
-
-### Requirements
-
-| Tool | Version |
-|------|---------|
-| Node.js | Node 22 LTS recommended. This repo can run on Node 18+, but Node 22 also matches the mobile repo's newer Vite requirement. |
-| pnpm | 10.x, enabled through Corepack. The version is pinned in `package.json`. |
-| Backend | QuantDinger API reachable at `http://127.0.0.1:5000`, unless you override the dev proxy. |
-
-Use `pnpm install` with the committed `pnpm-lock.yaml`. Avoid committing `package-lock.json`.
-
-### Start the app
-
-```bash
-git clone https://github.com/OpenByteInc/QuantDinger-Vue.git
-cd QuantDinger-Vue
-corepack enable
-pnpm install
-pnpm run serve
-```
-
-Open:
-
-```text
-http://localhost:8000
-```
-
-Start the backend first. You can run it from the main repo through Docker Compose, or run the Python API locally according to the backend README.
-
-### API proxy in development
-
-Local `/api/*` requests are proxied by `vite.config.js`.
-
-Default target:
-
-```text
-http://127.0.0.1:5000
-```
-
-Override it when needed:
-
-```bash
-VITE_DEV_PROXY_TARGET=http://127.0.0.1:5000 pnpm run serve
-```
-
-If DevTools shows `http://localhost:8000/api/...`, that is normal. The browser calls Vite on port `8000`, then Vite forwards the request to the backend.
-
-## Build from source
-
-```bash
-pnpm run build
-pnpm run preview
-```
-
-`pnpm run build` writes production assets to `dist/`.
-
-To build a local Docker image:
-
-```bash
-docker build -t quantdinger-frontend:local .
-docker run --rm -p 8888:80 -e BACKEND_URL=http://host.docker.internal:5000 quantdinger-frontend:local
-```
-
-## Project structure
-
-```text
-QuantDinger-Vue/
-├── public/                 # Static assets and HTML shell
-├── deploy/                 # Nginx templates for Docker production proxy
-├── src/
-│   ├── api/                # API request modules
-│   ├── assets/             # Images, icons, and styles
-│   ├── components/         # Shared UI components
-│   ├── config/             # App and router configuration
-│   ├── core/               # Bootstrapping, auth, and app setup
-│   ├── layouts/            # Page layouts
-│   ├── locales/            # i18n resources
-│   ├── router/             # Vue Router configuration
-│   ├── store/              # Vuex state
-│   ├── utils/              # Helpers, request interceptors, crypto utilities
-│   └── views/              # Page-level modules
-├── vite.config.js          # Vite build, version stamping, and dev proxy
-├── package.json
-├── pnpm-lock.yaml
-├── Dockerfile
-└── LICENSE
-```
-
-## Tech stack
-
-| Layer | Technology |
-|-------|------------|
-| Framework | Vue 2.7, Vue Router, Vuex |
-| UI | Ant Design Vue |
-| Charts | KLineCharts, ECharts |
-| Editor | CodeMirror 5 |
-| Networking | Axios |
-| i18n | vue-i18n |
-| Build | Vite 5, pnpm |
-| Styling | Less and scoped CSS |
-
-## Troubleshooting
-
-| Symptom | What to check |
-|---------|---------------|
-| Docker pull times out on `registry-1.docker.io` | Configure Docker Desktop proxy and verify the proxy port. The main repo has `docs/INSTALL_TROUBLESHOOTING.md` with bilingual steps. |
-| Browser returns `UNAUTHORIZED` for a Docker registry manifest URL | That usually means the registry is reachable. Docker obtains an auth token during `docker pull`; direct browser access is not the same flow. |
-| Login or API calls fail in local dev | Confirm the backend is running on `http://127.0.0.1:5000`, or set `VITE_DEV_PROXY_TARGET`. |
-| Container starts but API calls fail | Check `BACKEND_URL` and whether the frontend container can reach that address from inside Docker. |
-
-## Related repositories
-
-| Repository | Role |
-|------------|------|
-| [QuantDinger](https://github.com/OpenByteInc/QuantDinger) | Backend API, Docker Compose, database services, deployment docs |
-| **QuantDinger-Vue** | This repository: desktop web frontend source |
-| [QuantDinger-Mobile](https://github.com/OpenByteInc/QuantDinger-Mobile) | Mobile and H5 frontend |
-
-## License
-
-This repository is released under the **QuantDinger Frontend Source-Available License v1.0**. See [`LICENSE`](./LICENSE) for the full text.
-
-In short: non-commercial and qualified non-profit use is allowed under the license conditions; commercial use requires a separate written agreement with **Open Byte Inc**. Preserve copyright notices, the license file, and required QuantDinger attribution.
-
-## Contact
-
-- Website: [quantdinger.com](https://quantdinger.com)
-- Telegram: [t.me/worldinbroker](https://t.me/worldinbroker)
-- Email: [support@quantdinger.com](mailto:support@quantdinger.com)
+Apache License 2.0 — see [`LICENSE`](./LICENSE).
