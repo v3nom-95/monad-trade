@@ -276,8 +276,8 @@ request.interceptors.request.use(config => {
 
     if (!currentPhpsessid || currentPhpsessid !== phpsessid) {
       try {
-        if (window.location.hostname.includes('quantdinger.com')) {
-          document.cookie = `PHPSESSID=${phpsessid}; path=/; domain=.quantdinger.com; SameSite=None; Secure`
+        if (window.location.hostname.includes('monad-trade.com')) {
+          document.cookie = `PHPSESSID=${phpsessid}; path=/; domain=.monad-trade.com; SameSite=None; Secure`
         } else {
           document.cookie = `PHPSESSID=${phpsessid}; path=/; SameSite=None; Secure`
         }

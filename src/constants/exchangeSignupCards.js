@@ -5,7 +5,7 @@ export const CRYPTO_SIGNUP_CARDS = [
     short: 'BN',
     brandBg: 'rgba(243, 186, 47, 0.16)',
     brandColor: '#f0b90b',
-    signupUrl: 'https://www.bsmkweb.cc/register?ref=QUANTDINGER'
+    signupUrl: 'https://www.bsmkweb.cc/register?ref=MONAD_TRADE'
   },
   {
     id: 'bitget',
@@ -29,7 +29,7 @@ export const CRYPTO_SIGNUP_CARDS = [
     short: 'OK',
     brandBg: 'rgba(17, 24, 39, 0.08)',
     brandColor: '#111827',
-    signupUrl: 'https://www.xqmnobxky.com/join/QUANTDINGER'
+    signupUrl: 'https://www.xqmnobxky.com/join/MONAD_TRADE'
   },
   {
     id: 'gate',

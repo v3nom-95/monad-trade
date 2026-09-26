@@ -2983,7 +2983,7 @@ const locale = {
   "fastAnalysis.swingHigh20": "Cao 20 thanh",
   "fastAnalysis.swingLow20": "20 thanh swing thấp",
   "fastAnalysis.systemOnline": "Trực tuyến",
-  "fastAnalysis.systemTitle": "AI QUANTDINGER",
+  "fastAnalysis.systemTitle": "AI MONAD_TRADE",
   "fastAnalysis.takeProfit": "Chốt lời",
   "fastAnalysis.takeProfitHint": "Dựa trên chỉ báo ATR 3x và mức kháng cự",
   "fastAnalysis.takeProfitHintShort": "Chốt lời ngắn hạn: dưới giá hiện tại (kiếm lời nếu giá giảm). Giá trị lấy từ trading_plan ở phần quản trị.",

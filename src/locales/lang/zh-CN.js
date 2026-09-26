@@ -3232,7 +3232,7 @@ const locale = {
   "fastAnalysis.swingHigh20": "20 周期摆动高",
   "fastAnalysis.swingLow20": "20 周期摆动低",
   "fastAnalysis.systemOnline": "系统在线",
-  "fastAnalysis.systemTitle": "QUANTDINGER AI",
+  "fastAnalysis.systemTitle": "MONAD_TRADE AI",
   "fastAnalysis.takeProfit": "止盈目标",
   "fastAnalysis.takeProfitHint": "基于3倍ATR和阻力位计算",
   "fastAnalysis.takeProfitHintShort": "做空止盈：价格位于现价下方，下跌触及即盈利目标（与多单止盈方向相反）。数值来自后端 trading_plan。",

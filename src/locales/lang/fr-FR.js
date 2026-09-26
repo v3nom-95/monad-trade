@@ -2983,7 +2983,7 @@ const locale = {
   "fastAnalysis.swingHigh20": "Balançoire haute à 20 barres",
   "fastAnalysis.swingLow20": "swing bas à 20 barres",
   "fastAnalysis.systemOnline": "En ligne",
-  "fastAnalysis.systemTitle": "QUANTDINGER IA",
+  "fastAnalysis.systemTitle": "MONAD_TRADE IA",
   "fastAnalysis.takeProfit": "Prenez vos bénéfices",
   "fastAnalysis.takeProfitHint": "Basé sur 3x ATR et résistance",
   "fastAnalysis.takeProfitHintShort": "Objectif de profit court : inférieur au prix actuel (profit si le prix baisse). Valeurs issues du plan de trading backend.",

@@ -50,7 +50,7 @@ const DEFAULT_BRAND = {
   }
 }
 
-const STORAGE_KEY = 'quantdinger.brand-config.v1'
+const STORAGE_KEY = 'monad-trade.brand-config.v1'
 
 function readCachedBrand () {
   try {

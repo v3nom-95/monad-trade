@@ -4,8 +4,8 @@ import { join, resolve } from 'node:path'
 
 const root = resolve(process.cwd())
 const langDir = join(root, 'src', 'locales', 'lang')
-const seedLangDir = process.env.QUANTDINGER_LOCALE_SEED_DIR
-  ? resolve(process.env.QUANTDINGER_LOCALE_SEED_DIR)
+const seedLangDir = process.env.MONAD_TRADE_LOCALE_SEED_DIR
+  ? resolve(process.env.MONAD_TRADE_LOCALE_SEED_DIR)
   : langDir
 
 const specs = {

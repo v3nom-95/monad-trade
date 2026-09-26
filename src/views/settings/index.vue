@@ -1127,7 +1127,7 @@ export default {
       return [
         'admin',
         'administrator',
-        'quantdinger',
+        'monad-trade',
         'root',
         'user',
         'test',

@@ -4,8 +4,8 @@ name: Publish frontend image to GHCR
 # Registry, then (for v* tags only) cut a GitHub Release with the auto-
 # generated changelog and a `dist.tar.gz` static-asset bundle attached.
 #
-# Consumed by QuantDinger's docker-compose files as
-#   ghcr.io/<owner>/quantdinger-frontend:<tag>
+# Consumed by MonadTrade's docker-compose files as
+#   ghcr.io/<owner>/monad-trade-frontend:<tag>
 #
 # Triggers:
 #   - push of a version tag matching `v*` (e.g. v3.0.9) -> semver + latest
@@ -13,7 +13,7 @@ name: Publish frontend image to GHCR
 #   - manual workflow_dispatch -> short-SHA tag only, no Release
 #
 # First-time setup: after the first successful run, visit
-#   https://github.com/orgs/<owner>/packages/container/quantdinger-frontend/settings
+#   https://github.com/orgs/<owner>/packages/container/monad-trade-frontend/settings
 # and set the package visibility to public if anonymous `docker pull` is desired.
 
 on:
@@ -54,7 +54,7 @@ jobs:
       - name: Normalize GHCR image name
         id: image
         shell: bash
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/quantdinger-frontend" >> "$GITHUB_OUTPUT"
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/monad-trade-frontend" >> "$GITHUB_OUTPUT"
 
       - name: Extract image metadata
         id: meta
@@ -119,7 +119,7 @@ jobs:
             docker pull ${{ steps.image.outputs.name }}:${{ github.ref_name }}
             ```
 
-            Pinned in QuantDinger's `docker-compose.yml` via `IMAGE_TAG=${{ github.ref_name }}` in a project-root `.env`.
+            Pinned in MonadTrade's `docker-compose.yml` via `IMAGE_TAG=${{ github.ref_name }}` in a project-root `.env`.
 
             **Static bundle:** `dist.tar.gz` — extract into any nginx/static host as `/usr/share/nginx/html/` (verify with `dist.tar.gz.sha256`).
 

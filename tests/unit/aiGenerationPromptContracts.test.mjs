@@ -42,10 +42,10 @@ test('copilot builds workflow-specific artifact rules instead of mixing indicato
 test('English prompt overrides identify the indicator workflow as chart-only', () => {
   assert.match(
     overrides,
-    /"aiAssetAnalysis\.copilot\.nativeStrategyPrompt\.workflowIndicator": "QuantDinger Chart Indicator"/
+    /"aiAssetAnalysis\.copilot\.nativeStrategyPrompt\.workflowIndicator": "MonadTrade Chart Indicator"/
   )
   assert.doesNotMatch(
     overrides,
-    /"aiAssetAnalysis\.copilot\.nativeStrategyPrompt\.workflowIndicator": "QuantDinger Python Strategy API V2"/
+    /"aiAssetAnalysis\.copilot\.nativeStrategyPrompt\.workflowIndicator": "MonadTrade Python Strategy API V2"/
   )
 })

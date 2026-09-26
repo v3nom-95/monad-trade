@@ -2,8 +2,8 @@
 # Deploy: render.com → New → Blueprint → connect this repo → Apply
 databases:
   - name: monad-trade-db
-    databaseName: quantdinger
-    user: quantdinger
+    databaseName: monad-trade
+    user: monad-trade
     plan: free
 
 services:
@@ -17,7 +17,7 @@ services:
     runtime: image
     plan: free
     image:
-      url: ghcr.io/openbyteinc/quantdinger-backend:latest
+      url: ghcr.io/openbyteinc/monad-trade-backend:latest
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL

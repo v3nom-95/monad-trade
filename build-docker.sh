@@ -6,7 +6,7 @@ echo "Building frontend Docker image..."
 docker build \
   --pull \
   --platform linux/amd64 \
-  -t quantdinger-frontend:latest \
+  -t monad-trade-frontend:latest \
   -f Dockerfile \
   .
 
@@ -15,7 +15,7 @@ if [ $? -ne 0 ]; then
   docker build \
     --no-cache \
     --platform linux/amd64 \
-    -t quantdinger-frontend:latest \
+    -t monad-trade-frontend:latest \
     -f Dockerfile \
     .
 fi

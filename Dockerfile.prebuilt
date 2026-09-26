@@ -1,7 +1,7 @@
 # Local / CI fast path: reuse an existing `pnpm build` output in ./dist
 # without pulling node:18-alpine. Usage:
 #   pnpm run build
-#   docker build -f Dockerfile.prebuilt -t quantdinger-frontend:local .
+#   docker build -f Dockerfile.prebuilt -t monad-trade-frontend:local .
 
 ARG NGINX_IMAGE=nginx:1.25-alpine
 FROM ${NGINX_IMAGE}

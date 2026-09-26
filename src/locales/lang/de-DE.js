@@ -2983,7 +2983,7 @@ const locale = {
   "fastAnalysis.swingHigh20": "20-bar-Schwinghöhe",
   "fastAnalysis.swingLow20": "20-bar-Schwingung tief",
   "fastAnalysis.systemOnline": "Online",
-  "fastAnalysis.systemTitle": "QUANTDINGER KI",
+  "fastAnalysis.systemTitle": "MONAD_TRADE KI",
   "fastAnalysis.takeProfit": "Gewinnmitnahme",
   "fastAnalysis.takeProfitHint": "Basierend auf 3x ATR & Widerstand",
   "fastAnalysis.takeProfitHintShort": "Gewinnmitnahme bei fallenden Kursen: unterhalb des aktuellen Kurses (Gewinn bei Kursrückgang). Werte aus dem Backend-Handelsplan.",

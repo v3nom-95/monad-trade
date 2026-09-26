@@ -6,7 +6,7 @@ Write-Host "Building frontend Docker image..." -ForegroundColor Green
 $buildResult = docker build `
   --pull `
   --platform linux/amd64 `
-  -t quantdinger-frontend:latest `
+  -t monad-trade-frontend:latest `
   -f Dockerfile `
   .
 
@@ -15,7 +15,7 @@ if ($LASTEXITCODE -ne 0) {
     docker build `
       --no-cache `
       --platform linux/amd64 `
-      -t quantdinger-frontend:latest `
+      -t monad-trade-frontend:latest `
       -f Dockerfile `
       .
 }

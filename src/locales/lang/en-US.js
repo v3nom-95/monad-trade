@@ -4936,7 +4936,7 @@ const locale = {
   "fastAnalysis.analysisTime": "Analysis time",
   "fastAnalysis.startAnalysis": "Analyze",
   "fastAnalysis.history": "History",
-  "fastAnalysis.systemTitle": "QUANTDINGER AI",
+  "fastAnalysis.systemTitle": "MONAD_TRADE AI",
   "fastAnalysis.systemOnline": "Online",
   "fastAnalysis.version": "Fast",
   "fastAnalysis.preparing": "Preparing...",

@@ -2983,7 +2983,7 @@ const locale = {
   "fastAnalysis.swingHigh20": "20-барный маятник высоко",
   "fastAnalysis.swingLow20": "20-барный низкий уровень колебаний",
   "fastAnalysis.systemOnline": "Онлайн",
-  "fastAnalysis.systemTitle": "QUANTDINGER AI",
+  "fastAnalysis.systemTitle": "MONAD_TRADE AI",
   "fastAnalysis.takeProfit": "Фиксация прибыли",
   "fastAnalysis.takeProfitHint": "На основе 3-кратного увеличения ATR и сопротивления",
   "fastAnalysis.takeProfitHintShort": "Реализация короткой позиции: ниже текущей цены (прибыль при падении цены). Значения взяты из торгового плана бэкэнда.",

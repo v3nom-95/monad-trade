@@ -14,11 +14,11 @@ import {
 const root = resolve(process.cwd())
 const langDir = join(root, 'src', 'locales', 'lang')
 const outputPath = join(root, 'src', 'locales', 'generated-locale-overrides.js')
-const authEndpoint = process.env.QUANTDINGER_TRANSLATE_AUTH_ENDPOINT ||
+const authEndpoint = process.env.MONAD_TRADE_TRANSLATE_AUTH_ENDPOINT ||
   'https://edge.microsoft.com/translate/auth'
-const endpoint = process.env.QUANTDINGER_TRANSLATE_ENDPOINT ||
+const endpoint = process.env.MONAD_TRADE_TRANSLATE_ENDPOINT ||
   'https://api-edge.cognitive.microsofttranslator.com/translate'
-const requestDelayMs = Number(process.env.QUANTDINGER_TRANSLATE_DELAY_MS || 180)
+const requestDelayMs = Number(process.env.MONAD_TRADE_TRANSLATE_DELAY_MS || 180)
 const batchCharacterLimit = 3500
 const batchItemLimit = 90
 

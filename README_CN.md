@@ -1,7 +1,7 @@
-<h1 align="center">QuantDinger 桌面端前端</h1>
+<h1 align="center">MonadTrade 桌面端前端</h1>
 
 <p align="center">
-  <strong>QuantDinger 的桌面 Web 客户端，一个开源 AI Trading OS 的主要操作界面。</strong><br/>
+  <strong>MonadTrade 的桌面 Web 客户端，一个开源 AI Trading OS 的主要操作界面。</strong><br/>
   覆盖行情研究、策略编写、回测、自动化交易、组合管理、账户与运营工作流。
 </p>
 
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/OpenByteInc/QuantDinger"><img src="https://img.shields.io/badge/Main_Repo-QuantDinger-blue?logo=github" alt="Main Repo" /></a>
+  <a href="https://github.com/OpenByteInc/MonadTrade"><img src="https://img.shields.io/badge/Main_Repo-MonadTrade-blue?logo=github" alt="Main Repo" /></a>
   <img src="https://img.shields.io/badge/Vue-2.7-4FC08D?logo=vue.js" alt="Vue 2.7" />
   <img src="https://img.shields.io/badge/Vite-5-646CFF?logo=vite" alt="Vite 5" />
   <img src="https://img.shields.io/badge/UI-Ant_Design_Vue-1890ff?logo=ant-design" alt="Ant Design Vue" />
@@ -22,14 +22,14 @@
 
 ## 这个仓库是什么
 
-这是 [QuantDinger](https://github.com/OpenByteInc/QuantDinger) 的桌面端 Vue 前端源码仓库。QuantDinger 是 **Open Byte Inc** 的产品。
+这是 [MonadTrade](https://github.com/OpenByteInc/MonadTrade) 的桌面端 Vue 前端源码仓库。MonadTrade 是 **Open Byte Inc** 的产品。
 
-从产品定位上看，QuantDinger 更适合叫 **AI Trading OS**，也就是面向自动化交易的 AI 操作系统，而不是单纯的“量化平台”。它把 AI 市场分析、策略生成、回测、模拟盘交易、实盘执行工作流、交易所 API 管理、计费和运营后台放在同一套系统里。这个仓库负责其中的桌面浏览器界面。
+从产品定位上看，MonadTrade 更适合叫 **AI Trading OS**，也就是面向自动化交易的 AI 操作系统，而不是单纯的“量化平台”。它把 AI 市场分析、策略生成、回测、模拟盘交易、实盘执行工作流、交易所 API 管理、计费和运营后台放在同一套系统里。这个仓库负责其中的桌面浏览器界面。
 
 如果你要部署整套系统、查看后端接口、数据库、Docker Compose 或云端部署文档，请优先看主仓库：
 
-- [QuantDinger 主仓库](https://github.com/OpenByteInc/QuantDinger)
-- [云端部署文档](https://github.com/OpenByteInc/QuantDinger/tree/main/docs)
+- [MonadTrade 主仓库](https://github.com/OpenByteInc/MonadTrade)
+- [云端部署文档](https://github.com/OpenByteInc/MonadTrade/tree/main/docs)
 
 ## 主要能力
 
@@ -50,13 +50,13 @@
 Linux 或 macOS：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OpenByteInc/QuantDinger/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/OpenByteInc/MonadTrade/main/install.sh | bash
 ```
 
 Windows PowerShell：
 
 ```powershell
-irm https://raw.githubusercontent.com/OpenByteInc/QuantDinger/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/OpenByteInc/MonadTrade/main/install.ps1 | iex
 ```
 
 桌面端默认访问地址：
@@ -68,8 +68,8 @@ http://localhost:8888
 ### 不克隆仓库，直接用 GHCR Compose
 
 ```bash
-curl -O https://raw.githubusercontent.com/OpenByteInc/QuantDinger/main/docker-compose.ghcr.yml
-curl -o backend.env https://raw.githubusercontent.com/OpenByteInc/QuantDinger/main/backend_api_python/env.example
+curl -O https://raw.githubusercontent.com/OpenByteInc/MonadTrade/main/docker-compose.ghcr.yml
+curl -o backend.env https://raw.githubusercontent.com/OpenByteInc/MonadTrade/main/backend_api_python/env.example
 # 对外部署前先编辑 backend.env
 docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
@@ -78,7 +78,7 @@ docker compose -f docker-compose.ghcr.yml up -d
 前端镜像地址：
 
 ```text
-ghcr.io/openbyteinc/quantdinger-frontend
+ghcr.io/openbyteinc/monad-trade-frontend
 ```
 
 常用标签包括 `latest`、`4.0.4` 这样的语义化版本，以及 `4.0` 这样的主次版本标签。需要固定版本时，在主仓库 `.env` 中设置 `IMAGE_TAG`；只想单独固定桌面端前端时，设置 `FRONTEND_TAG`。
@@ -88,10 +88,10 @@ ghcr.io/openbyteinc/quantdinger-frontend
 当后端已经部署在别处时，可以只跑前端容器：
 
 ```bash
-docker run -d --name quantdinger-frontend \
+docker run -d --name monad-trade-frontend \
   -p 8888:80 \
   -e BACKEND_URL=http://host.docker.internal:5000 \
-  ghcr.io/openbyteinc/quantdinger-frontend:latest
+  ghcr.io/openbyteinc/monad-trade-frontend:latest
 ```
 
 `BACKEND_URL` 用来控制容器内 Nginx 的 `/api/` 反向代理目标。主仓库 Compose 中通常保持为 `http://backend:5000`。
@@ -104,15 +104,15 @@ docker run -d --name quantdinger-frontend \
 |------|------|
 | Node.js | 推荐 Node 22 LTS。本仓库本身可运行在 Node 18+，但手机端仓库的 Vite 版本要求更高，用 Node 22 可以同时覆盖两个前端仓库。 |
 | pnpm | 10.x，通过 Corepack 启用，版本已写在 `package.json`。 |
-| 后端 | 默认要求 QuantDinger API 可通过 `http://127.0.0.1:5000` 访问。 |
+| 后端 | 默认要求 MonadTrade API 可通过 `http://127.0.0.1:5000` 访问。 |
 
 请使用 `pnpm install` 和仓库里的 `pnpm-lock.yaml`。不要提交 `package-lock.json`。
 
 ### 启动开发服务
 
 ```bash
-git clone https://github.com/OpenByteInc/QuantDinger-Vue.git
-cd QuantDinger-Vue
+git clone https://github.com/OpenByteInc/MonadTrade-Vue.git
+cd MonadTrade-Vue
 corepack enable
 pnpm install
 pnpm run serve
@@ -156,14 +156,14 @@ pnpm run preview
 构建本地 Docker 镜像：
 
 ```bash
-docker build -t quantdinger-frontend:local .
-docker run --rm -p 8888:80 -e BACKEND_URL=http://host.docker.internal:5000 quantdinger-frontend:local
+docker build -t monad-trade-frontend:local .
+docker run --rm -p 8888:80 -e BACKEND_URL=http://host.docker.internal:5000 monad-trade-frontend:local
 ```
 
 ## 目录结构
 
 ```text
-QuantDinger-Vue/
+MonadTrade-Vue/
 ├── public/                 # 静态资源和 HTML 入口
 ├── deploy/                 # Docker 生产环境 Nginx 模板
 ├── src/
@@ -211,18 +211,18 @@ QuantDinger-Vue/
 
 | 仓库 | 作用 |
 |------|------|
-| [QuantDinger](https://github.com/OpenByteInc/QuantDinger) | 后端 API、Docker Compose、数据库服务和部署文档 |
-| **QuantDinger-Vue** | 本仓库：桌面端 Web 前端源码 |
-| [QuantDinger-Mobile](https://github.com/OpenByteInc/QuantDinger-Mobile) | 手机端和 H5 前端 |
+| [MonadTrade](https://github.com/OpenByteInc/MonadTrade) | 后端 API、Docker Compose、数据库服务和部署文档 |
+| **MonadTrade-Vue** | 本仓库：桌面端 Web 前端源码 |
+| [MonadTrade-Mobile](https://github.com/OpenByteInc/MonadTrade-Mobile) | 手机端和 H5 前端 |
 
 ## 许可协议
 
-本仓库使用 **QuantDinger Frontend Source-Available License v1.0**，完整条款见 [`LICENSE`](./LICENSE)。
+本仓库使用 **MonadTrade Frontend Source-Available License v1.0**，完整条款见 [`LICENSE`](./LICENSE)。
 
-简单说：符合条款的非商业用途和合格非营利用途可以免费使用；商业用途需要取得 **Open Byte Inc** 的书面授权。请保留版权声明、许可文件和应用内要求保留的 QuantDinger 品牌署名。
+简单说：符合条款的非商业用途和合格非营利用途可以免费使用；商业用途需要取得 **Open Byte Inc** 的书面授权。请保留版权声明、许可文件和应用内要求保留的 MonadTrade 品牌署名。
 
 ## 联系方式
 
-- 官网：[quantdinger.com](https://quantdinger.com)
+- 官网：[monad-trade.com](https://monad-trade.com)
 - Telegram：[t.me/worldinbroker](https://t.me/worldinbroker)
-- 邮箱：[support@quantdinger.com](mailto:support@quantdinger.com)
+- 邮箱：[support@monad-trade.com](mailto:support@monad-trade.com)
